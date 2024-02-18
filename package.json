@@ -1,0 +1,38 @@
+{
+  "name": "@nagisa~/node-red-systemair-save",
+  "version": "1.0.0",
+  "description": "Node-RED nodes to interact with SystemAIR’s SAVE line of products",
+  "node-red": {
+    "nodes": {
+      "systemair-save": "./dist/nodes/systemair-save.js"
+    }
+  },
+  "scripts": {
+    "prepare": "tsc src/nodes/systemair-save.ts --outDir dist/nodes -d && ./node_modules/rollup/dist/bin/rollup -c rollup.js --bundleConfigAsCjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nagisa/node-red-systemair-save.git"
+  },
+  "homepage": "https://github.com/nagisa/node-red-systemair-save",
+  "keywords": [
+    "node-red",
+    "systemair"
+  ],
+  "author": "Simonas Kazlauskas <node-red-systemair-save@kazlauskas.me>",
+  "files": [
+    "dist",
+    "examples"
+  ],
+  "license": "ISC",
+  "devDependencies": {
+    "@rollup/plugin-typescript": "^11.1.6",
+    "@types/node-red": "^1.3.4",
+    "glob": "^10.3.10",
+    "rollup": "^4.12.0",
+    "tslib": "^2.6.2",
+    "node-red-dev": "^0.1.6"
+  },
+  "dependencies": {
+  }
+}
