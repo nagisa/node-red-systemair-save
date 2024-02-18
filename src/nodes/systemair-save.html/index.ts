@@ -13,7 +13,7 @@ RED.nodes.registerType<SystemairSaveEditorNodeProperties>("dsmr", {
     },
     inputs: 1,
     outputs: 1,
-    icon: "font-awesome/fa-bolt",
+    icon: "systemair.svg",
     label: function() {
         return this.name||"systemair";
     },
