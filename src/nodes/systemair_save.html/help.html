@@ -1,0 +1,39 @@
+<script type="text/html" data-help-name="systemair register">
+  <p>Consumes a stream of DSMR data such as what might be obtained from an electricity meter over
+      its P1 port, frames it and gives the data a little bit of structure.</p>
+
+  <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt>payload
+            <span class="property-type">string</span>
+        </dt>
+        <dd>Send this node a command as a string in the payload. Supported commands are:
+          <ul>
+           <li><code>"READ"</code> – initiate a read of the device property.</li>
+          </ul>
+        </dd>
+        <dt>payload
+            <span class="property-type">number</span>
+        </dt>
+        <dd>Write the provided value to the device’s property. Note that not all registers are
+          writeable. Attempts to write to a read-only property will produce an error in the debug
+          panel.</dd>
+    </dl>
+
+ <h3>Outputs</h3>
+     <ol class="node-ports">
+         <li>output
+             <dl class="message-properties">
+                 <dt>payload <span class="property-type">number</span></dt>
+                 <dd>current value of the device property. Value will only be output in case of a
+                  successful read from the device.</dd>
+             </dl>
+         </li>
+     </ol>
+
+  <h3>Details</h3>
+
+
+  <h3>References</h3>
+
+</script>

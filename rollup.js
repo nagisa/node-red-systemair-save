@@ -48,6 +48,7 @@ const makePlugins = (nodeType) => [
     include: [
       `src/nodes/${nodeType}.html/*.ts`,
       `src/nodes/${nodeType}_types.ts`,
+      `src/nodes/systemair_registers.ts`,
     ],
     target: "es2018",
     tsconfig: false,
