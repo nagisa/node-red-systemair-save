@@ -1,33 +1,29 @@
 import { EditorRED, EditorNodeProperties } from "node-red";
-import { SystemairSaveOptions } from "../systemair_save_types";
+import { SystemairRegisterNodeOptions } from "../systemair_types";
 import { registers } from "../systemair_registers";
 
 declare const RED: EditorRED;
-declare global {
-    interface JQuery<TElement = HTMLElement> {
-        searchBox(options:any);
-        treeList(options:any);
-    }
-}
+interface SystemairRegisterNodeEditorProperties extends EditorNodeProperties, SystemairRegisterNodeOptions {}
 
-interface SystemairSaveEditorNodeProperties extends EditorNodeProperties, SystemairSaveOptions {}
-
-RED.nodes.registerType<SystemairSaveEditorNodeProperties>("systemair register", {
+RED.nodes.registerType<SystemairRegisterNodeEditorProperties>("systemair register", {
     category: 'network',
     color: '#ffffff',
     defaults: {
         name: { value: "" },
         register_id: {
             value: "",
+            // TODO: two argument version produces the red triangle, but relevant types are
+            // missing.
             // @ts-ignore
-            validate: (v, n) => registers.has(~~v) ? true : "unknown property"
+            validate: (v, n) => registers.has(~~v) ? true : "unknown register"
         },
         // @ts-ignore
         device: {
-            // TODO
-            type:"mqtt-broker",
+            type:"systemair save device",
             required:true,
         },
+        readback: { value: false },
+        output_style: { value: "payload" },
     },
     inputs: 1,
     outputs: 1,
@@ -36,8 +32,8 @@ RED.nodes.registerType<SystemairSaveEditorNodeProperties>("systemair register", 
         const regname = !this.register_id
                       ? undefined
                       : registers.get(~~this.register_id)?.name
-                                 .replace("REG_", "").split("_").join(" ");
-        return this.name || regname || "REGISTER";
+                                 .split("_").join(" ");
+        return this.name || regname || "register";
     },
     oneditprepare: function() {
         let register_id = ~~this.register_id;

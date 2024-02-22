@@ -4,13 +4,14 @@
   "description": "Node-RED nodes to interact with SystemAIR’s SAVE line of products",
   "node-red": {
     "nodes": {
-      "systemair_save": "./dist/nodes/systemair_save.js"
+      "systemair register": "./dist/nodes/systemair register.js",
+      "systemair save device": "./dist/nodes/systemair save device.js"
     }
   },
   "scripts": {
     "clean": "rm -r ./dist/",
     "copy-assets": "mkdir -p ./dist/nodes/ && cp -r ./src/icons ./dist/nodes/icons",
-    "build:runtime": "tsc ./src/nodes/systemair_save.ts --outDir ./dist/nodes -d",
+    "build:runtime": "tsc ./src/nodes/*.ts --outDir ./dist/nodes -d",
     "build:editor": "rollup -c ./rollup.js --bundleConfigAsCjs",
     "prepare": "npm run clean; npm run copy-assets & npm run build:runtime & npm run build:editor & wait"
 
