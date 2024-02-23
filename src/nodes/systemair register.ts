@@ -24,7 +24,7 @@ const init: NodeInitializer = (RED) => {
 
 
         this.on("input", (msg, send, done) => {
-            const sendResponse = (response: any) => {
+            const sendResponse = (response: number) => {
                 switch (props.output_style) {
                     case "payload":
                         RED.util.setMessageProperty(msg, 'topic', description.name, true);
@@ -44,7 +44,7 @@ const init: NodeInitializer = (RED) => {
                     this.status({ fill: "blue", shape: "dot", text: `Working…` });
                     broker.read(description).then(sendResponse).catch((e) => {
                         showError(e.message ?? e);
-                        this.error(e.message ?? e);
+                        this.debug(e.message ?? e);
                         return done();
                     });
                     break;

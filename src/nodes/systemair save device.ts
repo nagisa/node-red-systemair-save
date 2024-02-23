@@ -1,5 +1,5 @@
 import { NodeInitializer, NodeDef } from "node-red";
-import { SystemairSaveDevice, SystemairSaveDeviceOptions } from "./systemair_types";
+import { DataType, SystemairSaveDevice, SystemairSaveDeviceOptions } from "./systemair_types";
 import { client as modbus } from "jsmodbus";
 import { Socket } from 'net';
 import { Semaphore } from "await-semaphore";
@@ -67,7 +67,11 @@ const init: NodeInitializer = (RED) => {
                 release();
             }
             // FIXME: handle registers that are constructed from multiple parts transparently.
-            return result.response.body.values[0];
+            let value = result.response.body.values[0];
+            if (register_description.data_type == DataType.Temperature) {
+                value /= 10; // TODO: make conversions like these a method of datatype...
+            }
+            return value;
         };
     };
 
