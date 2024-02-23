@@ -12,6 +12,9 @@ RED.nodes.registerType<SystemairSaveDeviceEditorProperties>("systemair save devi
         proto: { value: "Modbus TCP" },
         address: { value: "" },
         port: { value: 502, validate: RED.validators.number(true), required: false },
+        max_concurrency: { value: 3, validate: RED.validators.number(true) },
+        device_id: { value: 1, validate: RED.validators.number(true) },
+        timeout: { value: 5000, validate: RED.validators.number(true) },
     },
     icon: "systemair.svg",
     label: function() {

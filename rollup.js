@@ -44,7 +44,7 @@ const htmlBundle = () => {
 const makePlugins = (nodeType) => [
   htmlWatch(),
   typescript({
-    lib: ["es2018", "dom"],
+    lib: ["es6", "dom"],
     include: [
       `src/nodes/${nodeType}.html/*.ts`,
       `src/nodes/systemair_types.ts`,

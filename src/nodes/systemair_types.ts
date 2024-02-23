@@ -3,11 +3,12 @@ import { Node } from "node-red";
 export enum DataType {
     I16,
     U16,
+    Temperature, // U16 scaled by 10
 }
 
 export enum RegisterType {
-    ReadOnly,
-    ReadWrite,
+    RO,
+    RW,
 }
 
 export type RegisterDescription = {
@@ -30,6 +31,9 @@ export interface SystemairSaveDeviceOptions {
     proto: "Modbus TCP" | "Modbus RTU";
     address: string,
     port: number,
+    timeout: number,
+    max_concurrency: number,
+    device_id: number,
 }
 
 export interface SystemairSaveDevice extends Node<{}> {
@@ -39,7 +43,9 @@ export interface SystemairSaveDevice extends Node<{}> {
 declare global {
     // TODO: relevant types are missing.
     interface JQuery<TElement = HTMLElement> {
-        searchBox(options:any);
-        treeList(options:any);
+        searchBox(options:any): JQuery<TElement>;
+        searchBox(whatever: "count", idk:any): JQuery<TElement>;
+        treeList(options:any): JQuery<TElement>;
+        treeList(whatever: 'selected'): any;
     }
 }
