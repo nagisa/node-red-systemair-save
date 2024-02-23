@@ -1,855 +1,1489 @@
 import { RegisterDescription, DataType, RegisterType } from "./systemair_types";
 
 function r(
-    name: string,
+    modbus_address: number,
     data_type: DataType,
     register_type: RegisterType,
-    modbus_address: number,
-    minimum?: number,
-    maximum?: number,
-    description?: string) : [ register: number, description: RegisterDescription ]
-{
+    name: string,
+    _minimum?: number,
+    _maximum?: number,
+): [number, RegisterDescription] {
     const address = ~~modbus_address;
-    return [ ~~modbus_address, {
+    return [~~modbus_address, {
         name: name,
         data_type: data_type,
         register_type: register_type,
         modbus_address: address,
-        description: description ?? "",
+        description: "",
     }];
-
 }
 
+const U16 = DataType.U16;
+const I16 = DataType.I16;
+const RO = RegisterType.RO;
+const RW = RegisterType.RW;
+const UD = undefined;
+
 const registers = new Map<number, RegisterDescription>([
- r("DEMC_RH_HIGHEST", DataType.U16, RegisterType.ReadOnly, 1001, 0, 100, "Highest value of all RH sensors"),
- r("DEMC_CO2_HIGHEST", DataType.U16, RegisterType.ReadOnly, 1002, 0, 2000, "Highest value of all CO2 sensors"),
- r("DEMC_RH_PI_SP", DataType.U16, RegisterType.ReadOnly, 1011, 0, 100, "Set point for RH demand control"),
- r("DEMC_RH_PI_FEEDBACK", DataType.U16, RegisterType.ReadOnly, 1012, 0, 100, "Sensor value for RH demand control"),
- r("DEMC_RH_PI_OUTPUT", DataType.U16, RegisterType.ReadOnly, 1019, undefined, undefined, "Output value for RH demand control. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("DEMC_CO2_PI_SP", DataType.U16, RegisterType.ReadOnly, 1021, 0, 2000, "Set point for CO2 demand control"),
- r("DEMC_CO2_PI_FEEDBACK", DataType.U16, RegisterType.ReadOnly, 1022, 0, 2000, "Sensor value for CO2 demand control"),
- r("DEMC_CO2_PI_OUTPUT", DataType.U16, RegisterType.ReadOnly, 1029, undefined, undefined, "Output value for CO2 demand control. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("DEMC_RH_SETTINGS_PBAND", DataType.U16, RegisterType.ReadWrite, 1031, 1, 100, "Pband setting for RH demand control"),
- r("DEMC_RH_SETTINGS_SP_SUMMER", DataType.U16, RegisterType.ReadWrite, 1033, 10, 100, "Set point setting for RH demand control winter time"),
- r("DEMC_RH_SETTINGS_SP_WINTER", DataType.U16, RegisterType.ReadWrite, 1034, 10, 100, "Set point setting for RH demand control summer time"),
- r("DEMC_RH_SETTINGS_ON_OFF", DataType.U16, RegisterType.ReadWrite, 1035, 0, 1, "Flag indicating if RH demand control is allowed"),
- r("SUMMER_WINTER", DataType.U16, RegisterType.ReadOnly, 1039, 0, 1, "Actual seasson for Demand Control\n0: Summer\n1: Winter"),
- r("DEMC_CO2_SETTINGS_PBAND", DataType.U16, RegisterType.ReadWrite, 1041, 50, 2000, "Pband setting for CO2 demand control"),
- r("DEMC_CO2_SETTINGS_SP", DataType.U16, RegisterType.ReadWrite, 1043, 100, 2000, "Set point setting for CO2 demand control"),
- r("DEMC_CO2_SETTINGS_ON_OFF", DataType.U16, RegisterType.ReadWrite, 1044, 0, 1, "Flag indicating if CO2 demand control isallowed"),
- r("USERMODE_HOLIDAY_TIME", DataType.U16, RegisterType.ReadWrite, 1101, 1, 365, "Time delay setting for user mode Holiday"),
- r("USERMODE_AWAY_TIME", DataType.U16, RegisterType.ReadWrite, 1102, 1, 72, "Time delay setting for user mode Away"),
- r("USERMODE_FIREPLACE_TIME", DataType.U16, RegisterType.ReadWrite, 1103, 1, 60, "Time delay setting for user mode Fire Place"),
- r("USERMODE_REFRESH_TIME", DataType.U16, RegisterType.ReadWrite, 1104, 1, 240, "Time delay setting for user mode Refresh"),
- r("USERMODE_CROWDED_TIME", DataType.U16, RegisterType.ReadWrite, 1105, 1, 8, "Time delay setting for user mode Crowded"),
- r("USERMODE_REMAINING_TIME_L", DataType.U16, RegisterType.ReadOnly, 1111, undefined, undefined, "Remaining time for the state Holiday/Away/Fire Place/Refresh/Crowded"),
- r("USERMODE_REMAINING_TIME_H", DataType.U16, RegisterType.ReadOnly, 1112, undefined, undefined, "Remaining time for the state Holiday/Away/Fire Place/Refresh/Crowded"),
- r("IAQ_SPEED_LEVEL_MIN", DataType.U16, RegisterType.ReadWrite, 1121, 2, 3, "Minimum level for Demand Control\n2: Low\n3: Normal"),
- r("IAQ_SPEED_LEVEL_MAX", DataType.U16, RegisterType.ReadWrite, 1122, 3, 5, "Maximum level for user Demand Control\n3: Normal\n4: High\n5: Maximum"),
- r("IAQ_LEVEL", DataType.U16, RegisterType.ReadOnly, 1123, 0, 2, "Actual IAQ level:\n0: Economic\n1: Good\n2: Improving"),
- r("USERMODE_MANUAL_AIRFLOW_LEVEL_SAF", DataType.U16, RegisterType.ReadWrite, 1131, 0, 4, "Fan speed level for mode Manual. Applies to both the SAF and the EAF fan.\n0: Off(1)\n2: Low\n3: Normal\n4: High\n(1): value Off only allowed if contents of register REG_FAN_MANUAL_STOP_ALLOWED is 1."),
- r("USERMODE_CROWDED_AIRFLOW_LEVEL_SAF", DataType.U16, RegisterType.ReadWrite, 1135, 3, 5, "Fan speed level for mode Crowded\n3: Normal\n4: High\n5: Maximum"),
- r("USERMODE_CROWDED_AIRFLOW_LEVEL_EAF", DataType.U16, RegisterType.ReadWrite, 1136, 3, 5, "Fan speed level for mode Crowded\n3: Normal\n4: High\n5: Maximum"),
- r("USERMODE_REFRESH_AIRFLOW_LEVEL_SAF", DataType.U16, RegisterType.ReadWrite, 1137, 3, 5, "Fan speed level for mode Refresh\n3: Normal\n4: High\n5: Maximum"),
- r("USERMODE_REFRESH_AIRFLOW_LEVEL_EAF", DataType.U16, RegisterType.ReadWrite, 1138, 3, 5, "Fan speed level for mode Refresh\n3: Normal\n4: High\n5: Maximum"),
- r("USERMODE_FIREPLACE_AIRFLOW_LEVEL_SAF", DataType.U16, RegisterType.ReadWrite, 1139, 3, 5, "Fan speed level for mode Fire Place\n3: Normal\n4: High\n5: Maximum"),
- r("USERMODE_FIREPLACE_AIRFLOW_LEVEL_EAF", DataType.U16, RegisterType.ReadWrite, 1140, 1, 3, "Fan speed level for mode Fire Place\n1: Minimum\n2: Low\n3: Normal"),
- r("USERMODE_AWAY_AIRFLOW_LEVEL_SAF", DataType.U16, RegisterType.ReadWrite, 1141, 0, 3, "Fan speed level for mode Away. Value Off only allowed if contents of register REG_FAN_MANUAL_STOP_ALLOWED is 1."),
- r("USERMODE_AWAY_AIRFLOW_LEVEL_EAF", DataType.U16, RegisterType.ReadWrite, 1142, 0, 3, "Fan speed level for mode Away. Value Off only allowed if contents of register REG_FAN_MANUAL_STOP_ALLOWED is 1."),
- r("USERMODE_HOLIDAY_AIRFLOW_LEVEL_SAF", DataType.U16, RegisterType.ReadWrite, 1143, 0, 3, "Fan speed level for mode Holiday. Value Off only allowed if contents of register REG_FAN_MANUAL_STOP_ALLOWED is 1."),
- r("USERMODE_HOLIDAY_AIRFLOW_LEVEL_EAF", DataType.U16, RegisterType.ReadWrite, 1144, 0, 3, "Fan speed level for mode Holiday. Value Off only allowed if contents of register REG_FAN_MANUAL_STOP_ALLOWED is 1."),
- r("USERMODE_COOKERHOOD_AIRFLOW_LEVEL_SAF", DataType.U16, RegisterType.ReadWrite, 1145, 1, 5, "Fan speed level for mode Cooker Hood\n2: Low\n3: Normal\n4: High"),
- r("USERMODE_COOKERHOOD_AIRFLOW_LEVEL_EAF", DataType.U16, RegisterType.ReadWrite, 1146, 1, 5, "Fan speed level for mode Cooker Hood\n1: Minimum\n2: Low\n3: Normal"),
- r("USERMODE_VACUUMCLEANER_AIRFLOW_LEVEL_SAF", DataType.U16, RegisterType.ReadWrite, 1147, 1, 5, "Fan speed level for mode Vacuum Cleaner\n2: Low\n3: Normal\n4: High"),
- r("USERMODE_VACUUMCLEANER_AIRFLOW_LEVEL_EAF", DataType.U16, RegisterType.ReadWrite, 1148, 1, 5, "Fan speed level for mode Vacuum Cleaner\n1: Minimum\n2: Low\n3: Normal"),
- r("USERMODE_CROWDED_T_OFFSET", DataType.I16, RegisterType.ReadWrite, 1151, -100, 0, "Temperature setpoint offset for user mode Crowded"),
- r("USERMODE_MODE", DataType.U16, RegisterType.ReadOnly, 1161, 0, 12, "Active User mode.\n0: Auto\n1: Manual\n2: Crowded\n3: Refresh\n4: Fireplace\n5: Away\n6: Holiday\n7: Cooker Hood\n8: Vacuum Cleaner\n9: CDI1\n10: CDI2\n11: CDI3\n12: PressureGuard"),
- r("USERMODE_HMI_CHANGE_REQUEST", DataType.U16, RegisterType.ReadWrite, 1162, 0, 7, "New desired user mode as requested by HMI\n0: None\n1: AUTO\n2: Manual\n3: Crowded\n4: Refresh\n5: Fireplace\n6: Away\n7: Holiday"),
- r("CDI_1_AIRFLOW_LEVEL_SAF", DataType.U16, RegisterType.ReadWrite, 1171, 0, 5, "Fan speed level for configurable digital input 1.\n0: Off\n1: Minimum\n2: Low\n3: Normal\n4: High\n5: Maximum"),
- r("CDI_1_AIRFLOW_LEVEL_EAF", DataType.U16, RegisterType.ReadWrite, 1172, 0, 5, "Fan speed level for configurable digital input 1.\n0: Off\n1: Minimum\n2: Low\n3: Normal\n4: High\n5: Maximum"),
- r("CDI_2_AIRFLOW_LEVEL_SAF", DataType.U16, RegisterType.ReadWrite, 1173, 0, 5, "Fan speed level for configurable digital input 2.\n0: Off\n1: Minimum\n2: Low\n3: Normal\n4: High\n5: Maximum"),
- r("CDI_2_AIRFLOW_LEVEL_EAF", DataType.U16, RegisterType.ReadWrite, 1174, 0, 5, "Fan speed level for configurable digital input 2.\n0: Off\n1: Minimum\n2: Low\n3: Normal\n4: High\n5: Maximum"),
- r("CDI_3_AIRFLOW_LEVEL_SAF", DataType.U16, RegisterType.ReadWrite, 1175, 0, 5, "Fan speed level for configurable digital input 3.\n0: Off\n1: Minimum\n2: Low\n3: Normal\n4: High\n5: Maximum"),
- r("CDI_3_AIRFLOW_LEVEL_EAF", DataType.U16, RegisterType.ReadWrite, 1176, 0, 5, "Fan speed level for configurable digital input 3.\n0: Off\n1: Minimum\n2: Low\n3: Normal\n4: High\n5: Maximum"),
- r("PRESSURE_GUARD_AIRFLOW_LEVEL_SAF", DataType.U16, RegisterType.ReadWrite, 1177, 0, 5, "Fan speed level for configurable pressure guard function.\n0: Off\n1: Minimum\n2: Low\n3: Normal\n4: High\n5: Maximum"),
- r("PRESSURE_GUARD_AIRFLOW_LEVEL_EAF", DataType.U16, RegisterType.ReadWrite, 1178, 0, 5, "Fan speed level for configurable pressure guard function.\n0: Off\n1: Minimum\n2: Low\n3: Normal\n4: High\n5: Maximum"),
- r("USERMODE_HOLIDAY_DI_OFF_DELAY", DataType.U16, RegisterType.ReadWrite, 1181, 0, 365, "Off delay for DI"),
- r("USERMODE_AWAY_DI_OFF_DELAY", DataType.U16, RegisterType.ReadWrite, 1182, 0, 72, "Off delay for DI"),
- r("USERMODE_FIRPLACE_DI_OFF_DELAY", DataType.U16, RegisterType.ReadWrite, 1183, 0, 60, "Off delay for DI"),
- r("USERMODE_REFRESH_DI_OFF_DELAY", DataType.U16, RegisterType.ReadWrite, 1184, 0, 240, "Off delay for DI"),
- r("USERMODE_CROWDED_DI_OFF_DELAY", DataType.U16, RegisterType.ReadWrite, 1185, 0, 8, "Off delay for DI"),
- r("CDI1_OFF_DELAY", DataType.U16, RegisterType.ReadWrite, 1188, 0, 240, "Off delay for DI"),
- r("CDI2_OFF_DELAY", DataType.U16, RegisterType.ReadWrite, 1189, 0, 240, "Off delay for DI"),
- r("CDI3_OFF_DELAY", DataType.U16, RegisterType.ReadWrite, 1190, 0, 240, "Off delay for DI"),
- r("SPEED_CDI1_SAF", DataType.U16, RegisterType.ReadOnly, 1221, undefined, undefined, "SAF speed value for user mode Holiday. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("SPEED_CDI1_EAF", DataType.U16, RegisterType.ReadOnly, 1222, undefined, undefined, "EAF speed value for user mode Holiday. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("SPEED_CDI2_SAF", DataType.U16, RegisterType.ReadOnly, 1223, undefined, undefined, "SAF speed value for mode Cooker Hood. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("SPEED_CDI2_EAF", DataType.U16, RegisterType.ReadOnly, 1224, undefined, undefined, "EAF speed value for mode Cooker Hood. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("SPEED_CDI3_SAF", DataType.U16, RegisterType.ReadOnly, 1225, undefined, undefined, "SAF speed value for mode Vacuum Cleaner. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("SPEED_CDI3_EAF", DataType.U16, RegisterType.ReadOnly, 1226, undefined, undefined, "EAF speed value for mode Vacuum Cleaner. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("SPEED_PRESSURE_GUARD_SAF", DataType.U16, RegisterType.ReadOnly, 1227, undefined, undefined, "SAF speed value for low fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("SPEED_PRESSURE_GUARD_EAF", DataType.U16, RegisterType.ReadOnly, 1228, undefined, undefined, "EAF speed value for low fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("FAN_OUTDOOR_COMP_TYPE", DataType.U16, RegisterType.ReadWrite, 1251, 0, 1, "Compensate only SF or both SF and EF\n0: SAF\n1: SAF/EAF"),
- r("FAN_OUTDOOR_COMP_MAX_VALUE", DataType.U16, RegisterType.ReadWrite, 1252, 0, 50, "Compensation value at lowest temperature."),
- r("FAN_OUTDOOR_COMP_STOP_T_WINTER", DataType.I16, RegisterType.ReadWrite, 1253, -300, 0, "Temperature at which compensation reaches maximum value during the winter period."),
- r("FAN_OUTDOOR_COMP_MAX_TEMP", DataType.I16, RegisterType.ReadWrite, 1254, -300, 0, "Temperature at which highest compensation is applied."),
- r("FAN_OUTDOOR_COMP_START_T_WINTER", DataType.U16, RegisterType.ReadWrite, 1256, -300, 0, "Temperature at which compensation starts during the winter period."),
- r("FAN_OUTDOOR_COMP_START_T_SUMMER", DataType.U16, RegisterType.ReadWrite, 1257, 150, 300, "Temperature at which compensation starts during the summer period."),
- r("FAN_OUTDOOR_COMP_STOP_T_SUMMER", DataType.U16, RegisterType.ReadWrite, 1258, 150, 400, "Temperature at which compensation reaches maximum value during the summer period."),
- r("FAN_OUTDOOR_COMP_VALUE_SUMMER", DataType.U16, RegisterType.ReadWrite, 1259, 0, 50, "Compensation value during summer period"),
- r("FAN_REGULATION_UNIT", DataType.U16, RegisterType.ReadWrite, 1274, 0, 4, "Type of fan control mode.\n0: Manual\n1: RPM\n2: VAV (Constant Pressure)\n3: CAV (Constant Flow)4: DCV (External)"),
- r("FAN_LEVEL_SAF_MIN", DataType.U16, RegisterType.ReadOnly, 1301, undefined, undefined, "SAF speed value for minimum fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("FAN_LEVEL_EAF_MIN", DataType.U16, RegisterType.ReadOnly, 1302, undefined, undefined, "EAF speed value for minimum fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("FAN_LEVEL_SAF_LOW", DataType.U16, RegisterType.ReadOnly, 1303, undefined, undefined, "SAF speed value for low fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("FAN_LEVEL_EAF_LOW", DataType.U16, RegisterType.ReadOnly, 1304, undefined, undefined, "EAF speed value for low fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("FAN_LEVEL_SAF_NORMAL", DataType.U16, RegisterType.ReadOnly, 1305, undefined, undefined, "SAF speed value for normal fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("FAN_LEVEL_EAF_NORMAL", DataType.U16, RegisterType.ReadOnly, 1306, undefined, undefined, "EAF speed value for normal fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("FAN_LEVEL_SAF_HIGH", DataType.U16, RegisterType.ReadOnly, 1307, undefined, undefined, "SAF speed value for high fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("FAN_LEVEL_EAF_HIGH", DataType.U16, RegisterType.ReadOnly, 1308, undefined, undefined, "EAF speed value for high fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("FAN_LEVEL_SAF_MAX", DataType.U16, RegisterType.ReadOnly, 1309, undefined, undefined, "SAF speed value for maximum fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("FAN_LEVEL_EAF_MAX", DataType.U16, RegisterType.ReadOnly, 1310, undefined, undefined, "EAF speed value for maximum fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow"),
- r("SPEED_FANS_RUNNING", DataType.U16, RegisterType.ReadOnly, 1351, 0, 1, "Indicates that both fans are running"),
- r("SPEED_SAF_DESIRED_OFF", DataType.U16, RegisterType.ReadOnly, 1352, 0, 1, "Indicates that the SAF shall be turned off once the electrical reheater is cooled down."),
- r("FAN_MANUAL_STOP_ALLOWED", DataType.U16, RegisterType.ReadWrite, 1353, 0, 1, "Allow manual fan stop (also as selection for user modes and Week schedule).\n0: Manual stop not allowed\n1: Manual stop allowed"),
- r("SPEED_ELECTRICAL_HEATER_HOT_COUNTER", DataType.U16, RegisterType.ReadOnly, 1357, undefined, undefined, "Electrical Heater hot counter. Count down from 120 sec."),
- r("FAN_SPEED_AFTER_HEATER_COOLING_DOWN_SAF", DataType.U16, RegisterType.ReadOnly, 1358, 0, 100, "Supply Air Fan Speed Level After Heater Cooling Down"),
- r("FAN_SPEED_AFTER_HEATER_COOLING_DOWN_EAF", DataType.U16, RegisterType.ReadOnly, 1359, 0, 100, "Extract Air Fan Speed Level After Heater Cooling Down"),
- r("FAN_LEVEL_SAF_MIN_PERCENTAGE", DataType.U16, RegisterType.ReadWrite, 1401, 16, 100, "SAF speed value for minimum fan speed"),
- r("FAN_LEVEL_EAF_MIN_PERCENTAGE", DataType.U16, RegisterType.ReadWrite, 1402, 16, 100, "EAF speed value for minimum fan speed"),
- r("FAN_LEVEL_SAF_LOW_PERCENTAGE", DataType.U16, RegisterType.ReadWrite, 1403, 16, 100, "SAF speed value for low fan speed"),
- r("FAN_LEVEL_EAF_LOW_PERCENTAGE", DataType.U16, RegisterType.ReadWrite, 1404, 16, 100, "EAF speed value for low fan speed"),
- r("FAN_LEVEL_SAF_NORMAL_PERCENTAGE", DataType.U16, RegisterType.ReadWrite, 1405, 16, 100, "SAF speed value for normal fan speed"),
- r("FAN_LEVEL_EAF_NORMAL_PERCENTAGE", DataType.U16, RegisterType.ReadWrite, 1406, 16, 100, "EAF speed value for normal fan speed"),
- r("FAN_LEVEL_SAF_HIGH_PERCENTAGE", DataType.U16, RegisterType.ReadWrite, 1407, 16, 100, "SAF speed value for high fan speed"),
- r("FAN_LEVEL_EAF_HIGH_PERCENTAGE", DataType.U16, RegisterType.ReadWrite, 1408, 16, 100, "EAF speed value for high fan speed"),
- r("FAN_LEVEL_SAF_MAX_PERCENTAGE", DataType.U16, RegisterType.ReadWrite, 1409, 16, 100, "SAF speed value for maximum fan speed"),
- r("FAN_LEVEL_EAF_MAX_PERCENTAGE", DataType.U16, RegisterType.ReadWrite, 1410, 16, 100, "EAF speed value for maximum fan speed"),
- r("FAN_LEVEL_SAF_MIN_RPM", DataType.U16, RegisterType.ReadWrite, 1411, 500, 5000, "SAF speed value for minimum fan speed"),
- r("FAN_LEVEL_EAF_MIN_RPM", DataType.U16, RegisterType.ReadWrite, 1412, 500, 5000, "EAF speed value for minimum fan speed"),
- r("FAN_LEVEL_SAF_LOW_RPM", DataType.U16, RegisterType.ReadWrite, 1413, 500, 5000, "SAF speed value for low fan speed"),
- r("FAN_LEVEL_EAF_LOW_RPM", DataType.U16, RegisterType.ReadWrite, 1414, 500, 5000, "EAF speed value for low fan speed"),
- r("FAN_LEVEL_SAF_NORMAL_RPM", DataType.U16, RegisterType.ReadWrite, 1415, 500, 5000, "SAF speed value for normal fan speed"),
- r("FAN_LEVEL_EAF_NORMAL_RPM", DataType.U16, RegisterType.ReadWrite, 1416, 500, 5000, "EAF speed value for normal fan speed"),
- r("FAN_LEVEL_SAF_HIGH_RPM", DataType.U16, RegisterType.ReadWrite, 1417, 500, 5000, "SAF speed value for high fan speed"),
- r("FAN_LEVEL_EAF_HIGH_RPM", DataType.U16, RegisterType.ReadWrite, 1418, 500, 5000, "EAF speed value for high fan speed"),
- r("FAN_LEVEL_SAF_MAX_RPM", DataType.U16, RegisterType.ReadWrite, 1419, 500, 5000, "SAF speed value for maximum fan speed"),
- r("FAN_LEVEL_EAF_MAX_RPM", DataType.U16, RegisterType.ReadWrite, 1420, 500, 5000, "EAF speed value for maximum fan speed"),
- r("FAN_LEVEL_SAF_MIN_PRESSURE", DataType.U16, RegisterType.ReadWrite, 1421, undefined, undefined, "SAF speed value for minimum fan speed"),
- r("FAN_LEVEL_EAF_MIN_PRESSURE", DataType.U16, RegisterType.ReadWrite, 1422, undefined, undefined, "EAF speed value for minimum fan speed"),
- r("FAN_LEVEL_SAF_LOW_PRESSURE", DataType.U16, RegisterType.ReadWrite, 1423, undefined, undefined, "SAF speed value for low fan speed"),
- r("FAN_LEVEL_EAF_LOW_PRESSURE", DataType.U16, RegisterType.ReadWrite, 1424, undefined, undefined, "EAF speed value for low fan speed"),
- r("FAN_LEVEL_SAF_NORMAL_PRESSURE", DataType.U16, RegisterType.ReadWrite, 1425, undefined, undefined, "SAF speed value for normal fan speed"),
- r("FAN_LEVEL_EAF_NORMAL_PRESSURE", DataType.U16, RegisterType.ReadWrite, 1426, undefined, undefined, "EAF speed value for normal fan speed"),
- r("FAN_LEVEL_SAF_HIGH_PRESSURE", DataType.U16, RegisterType.ReadWrite, 1427, undefined, undefined, "SAF speed value for high fan speed"),
- r("FAN_LEVEL_EAF_HIGH_PRESSURE", DataType.U16, RegisterType.ReadWrite, 1428, undefined, undefined, "EAF speed value for high fan speed"),
- r("FAN_LEVEL_SAF_MAX_PRESSURE", DataType.U16, RegisterType.ReadWrite, 1429, undefined, undefined, "SAF speed value for maximum fan speed"),
- r("FAN_LEVEL_EAF_MAX_PRESSURE", DataType.U16, RegisterType.ReadWrite, 1430, undefined, undefined, "EAF speed value for maximum fan speed"),
- r("FAN_LEVEL_SAF_MIN_FLOW", DataType.U16, RegisterType.ReadWrite, 1431, undefined, undefined, "SAF speed value for minimum fan speed"),
- r("FAN_LEVEL_EAF_MIN_FLOW", DataType.U16, RegisterType.ReadWrite, 1432, undefined, undefined, "EAF speed value for minimum fan speed"),
- r("FAN_LEVEL_SAF_LOW_FLOW", DataType.U16, RegisterType.ReadWrite, 1433, undefined, undefined, "SAF speed value for low fan speed"),
- r("FAN_LEVEL_EAF_LOW_FLOW", DataType.U16, RegisterType.ReadWrite, 1434, undefined, undefined, "EAF speed value for low fan speed"),
- r("FAN_LEVEL_SAF_NORMAL_FLOW", DataType.U16, RegisterType.ReadWrite, 1435, undefined, undefined, "SAF speed value for normal fan speed"),
- r("FAN_LEVEL_EAF_NORMAL_FLOW", DataType.U16, RegisterType.ReadWrite, 1436, undefined, undefined, "EAF speed value for normal fan speed"),
- r("FAN_LEVEL_SAF_HIGH_FLOW", DataType.U16, RegisterType.ReadWrite, 1437, undefined, undefined, "SAF speed value for high fan speed"),
- r("FAN_LEVEL_EAF_HIGH_FLOW", DataType.U16, RegisterType.ReadWrite, 1438, undefined, undefined, "EAF speed value for high fan speed"),
- r("FAN_LEVEL_SAF_MAX_FLOW", DataType.U16, RegisterType.ReadWrite, 1439, undefined, undefined, "SAF speed value for maximum fan speed"),
- r("FAN_LEVEL_EAF_MAX_FLOW", DataType.U16, RegisterType.ReadWrite, 1440, undefined, undefined, "EAF speed value for maximum fan speed"),
- r("USERMODE_REMAINING_TIME_CDI1_L", DataType.U16, RegisterType.ReadOnly, 1621, undefined, undefined, "Remaining time"),
- r("USERMODE_REMAINING_TIME_CDI1_H", DataType.U16, RegisterType.ReadOnly, 1622, undefined, undefined, ""),
- r("USERMODE_REMAINING_TIME_CDI2_L", DataType.U16, RegisterType.ReadOnly, 1623, undefined, undefined, "Remaining time"),
- r("USERMODE_REMAINING_TIME_CDI2_H", DataType.U16, RegisterType.ReadOnly, 1624, undefined, undefined, ""),
- r("USERMODE_REMAINING_TIME_CDI3_L", DataType.U16, RegisterType.ReadOnly, 1625, undefined, undefined, "Remaining time"),
- r("USERMODE_REMAINING_TIME_CDI3_H", DataType.U16, RegisterType.ReadOnly, 1626, undefined, undefined, ""),
- r("TC_SP", DataType.I16, RegisterType.ReadWrite, 2001, 120, 300, "Temperature setpoint for the supply airtemperature"),
- r("TC_CASCADE_SP", DataType.I16, RegisterType.ReadWrite, 2013, 120, 400, "Temperature set point for SATC, as calculated by RATC/EATC during cascade control"),
- r("TC_CASCADE_SP_MIN", DataType.I16, RegisterType.ReadWrite, 2021, 120, 400, "Minimum temperature set point for the SATC"),
- r("TC_CASCADE_SP_MAX", DataType.I16, RegisterType.ReadWrite, 2022, 120, 400, "Maximum temperature set point for the SATC"),
- r("TC_CONTROL_MODE", DataType.U16, RegisterType.ReadWrite, 2031, 0, 2, "Unit temperature control mode\n0: Supply\n1: Room\n2: Extract"),
- r("TC_EAT_RAT_SP", DataType.I16, RegisterType.ReadOnly, 2051, 120, 400, "EAT or RAT value, used for room/extract air controller."),
- r("TC_ROOM_CTRL_SP_SATC", DataType.I16, RegisterType.ReadOnly, 2053, 120, 400, "Temperature set point for SATC, as calculated by RATC/EATC during cascade control"),
- r("TC_SP_SATC", DataType.I16, RegisterType.ReadOnly, 2054, 120, 300, "Temperature setpoint for the supply airtemperature"),
- r("SATC_HEAT_DEMAND", DataType.U16, RegisterType.ReadOnly, 2055, 0, 100, "Output of the SATC (0-100%)"),
- r("SATC_PI_SP", DataType.I16, RegisterType.ReadOnly, 2061, 120, 300, "SATC setpoint value"),
- r("SATC_PI_OUTPUT", DataType.I16, RegisterType.ReadOnly, 2069, 0, 100, "SATC output signal"),
- r("ROOM_CTRL_PI_SP", DataType.I16, RegisterType.ReadOnly, 2071, 120, 300, "RATC setpoint value"),
- r("ROOM_CTRL_PI_OUTPUT", DataType.I16, RegisterType.ReadOnly, 2079, 0, 100, "RATC output signal"),
- r("INPUT_EXTERNAL_CTRL_SAF", DataType.U16, RegisterType.ReadOnly, 2101, 0, 100, "Value from External Controller Input, SAF. In %."),
- r("INPUT_EXTERNAL_CTRL_EAF", DataType.U16, RegisterType.ReadOnly, 2102, 0, 100, "Value from External Controller Input, EAF. In %."),
- r("HEATER_CIRC_PUMP_START_T", DataType.I16, RegisterType.ReadWrite, 2113, 0, 200, "Temperature at which the Heater circulation pump is started"),
- r("HEATER_CIRC_PUMP_STOP_DELAY", DataType.U16, RegisterType.ReadWrite, 2122, 0, 60, "Off time delay for the heater circulation pump in minutes"),
- r("HEAT_EXCHANGER_COOLING_RECOVERY_ON_OFF", DataType.U16, RegisterType.ReadWrite, 2134, 0, 1, "Enabling of cooling recovery"),
- r("HEAT_EXCHANGER_RH_TRANSFER_CTRL_ENABLED", DataType.U16, RegisterType.ReadOnly, 2147, undefined, undefined, "Indicates if RH trasnfer control shall beapplied"),
- r("PWM_TRIAC_OUTPUT", DataType.U16, RegisterType.ReadOnly, 2149, 0, 100, "TRIAC after manual override"),
- r("ROTOR_RH_TRANSFER_CTRL_PBAND", DataType.U16, RegisterType.ReadWrite, 2201, 0, 40, "Pband setting for RH transfer control"),
- r("ROTOR_RH_TRANSFER_CTRL_ITIME", DataType.U16, RegisterType.ReadWrite, 2202, 120, 0, "Itime setting for RH transfer control"),
- r("ROTOR_RH_TRANSFER_CTRL_SETPOINT", DataType.U16, RegisterType.ReadWrite, 2203, 100, 45, "Set point setting for RH transfer control"),
- r("ROTOR_RH_TRANSFER_CTRL_ON_OFF", DataType.U16, RegisterType.ReadWrite, 2204, 1, 1, "Enabling of humidity transfer control"),
- r("ROTOR_EA_SPEC_HUMIDITY", DataType.U16, RegisterType.ReadOnly, 2211, undefined, undefined, "Extract air specific humidity (g/kg)"),
- r("ROTOR_OA_SPEC_HUMIDITY", DataType.U16, RegisterType.ReadOnly, 2212, undefined, undefined, "Outdoor air specific humidity at assumed 90% RH outdoors"),
- r("ROTOR_EA_SPEC_HUMIDITY_SETPOINT", DataType.U16, RegisterType.ReadOnly, 2213, undefined, undefined, "Moisture transfer control specific humidity setpoint"),
- r("COOLER_FROM_SATC", DataType.U16, RegisterType.ReadOnly, 2311, 0, 100, "Cooler signal"),
- r("COOLER_CIRC_PUMP_START_T", DataType.U16, RegisterType.ReadWrite, 2314, 0, 200, "Temperature at which the cooler circulation pump is started"),
- r("COOLER_RECOVERY_LIMIT_T", DataType.U16, RegisterType.ReadWrite, 2315, 0, 100, "Temperature at which cooling recovery is allowed"),
- r("COOLER_OAT_INTERLOCK_T", DataType.U16, RegisterType.ReadWrite, 2316, 120, 250, "Temperature at which cooling is interlocked"),
- r("COOLER_CIRC_PUMP_STOP_DELAY", DataType.U16, RegisterType.ReadWrite, 2317, 0, 60, "Off time delay for the cooler circulation pump in minutes"),
- r("EXTRA_CONTROLLER_SET_PI_SETPOINT", DataType.I16, RegisterType.ReadWrite, 2403, -300, 400, "Set point value for the extra controller PI regulator"),
- r("EXTRA_CONTROLLER_CIRC_PUMP_START_T", DataType.I16, RegisterType.ReadWrite, 2404, 0, 200, "Start temperature for extra controller circulation pump"),
- r("EXTRA_CONTROLLER_CIRC_PUMP_STOP_DELAY", DataType.U16, RegisterType.ReadWrite, 2405, 0, 60, "Off time delay for the extra controller circulation pump in minutes"),
- r("EXTRA_CONTROLLER_PREHEATER_SETPOINT_TYPE", DataType.U16, RegisterType.ReadWrite, 2418, 0, 1, "Temperature setpoint for the preheater.\n0: Auto\n1: Manual"),
- r("EXTRA_CONTROLLER_GEO_PREHEATER_SP", DataType.I16, RegisterType.ReadWrite, 2420, -300, 100, ""),
- r("EXTRA_CONTROLLER_GEO_PREHEATER_ACTIVATION_T", DataType.I16, RegisterType.ReadWrite, 2421, -300, 0, ""),
- r("EXTRA_CONTROLLER_GEO_PRECOOLER_SP", DataType.I16, RegisterType.ReadWrite, 2422, 100, 300, ""),
- r("EXTRA_CONTROLLER_GEO_PRECOOLER_ACTIVATION_T", DataType.I16, RegisterType.ReadWrite, 2423, 150, 300, ""),
- r("CHANGE_OVER_CIRC_PUMP_START_T", DataType.I16, RegisterType.ReadWrite, 2451, 0, 200, "Start temperature for the change-over circulation pump"),
- r("CHANGE_OVER_CIRC_PUMP_STOP_DELAY", DataType.U16, RegisterType.ReadWrite, 2452, 0, 60, "Off time delay for the change-over circulation pump in minutes"),
- r("ECO_T_Y1_OFFSET", DataType.I16, RegisterType.ReadWrite, 2504, 0, 100, "Temperature offset for heating during Eco mode"),
- r("ECO_MODE_ON_OFF", DataType.U16, RegisterType.ReadWrite, 2505, 0, 1, "Enabling of eco mode"),
- r("ECO_FUNCTION_ACTIVE", DataType.U16, RegisterType.ReadOnly, 2506, 0, 1, "Indicates if conditions for ECO mode are"),
- r("FUNCTION_ACTIVE_COOLING", DataType.U16, RegisterType.ReadOnly, 3101, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_FREE_COOLING", DataType.U16, RegisterType.ReadOnly, 3102, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_HEATING", DataType.U16, RegisterType.ReadOnly, 3103, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_DEFROSTING", DataType.U16, RegisterType.ReadOnly, 3104, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_HEAT_RECOVERY", DataType.U16, RegisterType.ReadOnly, 3105, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_COOLING_RECOVERY", DataType.U16, RegisterType.ReadOnly, 3106, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_MOISTURE_TRANSFER", DataType.U16, RegisterType.ReadOnly, 3107, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_SECONDARY_AIR", DataType.U16, RegisterType.ReadOnly, 3108, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_VACUUM_CLEANER", DataType.U16, RegisterType.ReadOnly, 3109, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_COOKER_HOOD", DataType.U16, RegisterType.ReadOnly, 3110, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_USER_LOCK", DataType.U16, RegisterType.ReadOnly, 3111, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_ECO_MODE", DataType.U16, RegisterType.ReadOnly, 3112, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_HEATER_COOL_DOWN", DataType.U16, RegisterType.ReadOnly, 3113, 0, 1, "Active Heater Cool Down"),
- r("FUNCTION_ACTIVE_HEATER_COOL_DOWN", DataType.U16, RegisterType.ReadOnly, 3113, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_PRESSURE_GUARD", DataType.U16, RegisterType.ReadOnly, 3114, 0, 1, "Indicates if function is active"),
- r("FUNCTION_ACTIVE_PRESSURE_GUARD", DataType.U16, RegisterType.ReadOnly, 3114, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_CDI_1", DataType.U16, RegisterType.ReadOnly, 3115, 0, 1, "Indicates if function is active"),
- r("FUNCTION_ACTIVE_CDI_1", DataType.U16, RegisterType.ReadOnly, 3115, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_CDI_2", DataType.U16, RegisterType.ReadOnly, 3116, 0, 1, "Indicates if function is active"),
- r("FUNCTION_ACTIVE_CDI_2", DataType.U16, RegisterType.ReadOnly, 3116, undefined, undefined, "Is the function currently active?"),
- r("FUNCTION_ACTIVE_CDI_3", DataType.U16, RegisterType.ReadOnly, 3117, 0, 1, "Indicates if function is active"),
- r("FUNCTION_ACTIVE_CDI_3", DataType.U16, RegisterType.ReadOnly, 3117, undefined, undefined, "Is the function currently active?"),
- r("FREE_COOLING_ON_OFF", DataType.U16, RegisterType.ReadWrite, 4101, undefined, 1, "Indicates if free cooling is enabled"),
- r("FREE_COOLING_ON_OFF", DataType.U16, RegisterType.ReadWrite, 4101, undefined, 1, "Indicates if free cooling is enabled"),
- r("FREE_COOLING_OUTDOOR_DAYTIME_T", DataType.I16, RegisterType.ReadWrite, 4102, 120, 300, "Minimum of highest daytime temperature for start of free cooling."),
- r("FREE_COOLING_OUTDOOR_NIGHTTIME_DEACTIVATION_HIGH_T_LIMIT", DataType.I16, RegisterType.ReadWrite, 4103, 70, 300, "Highest night temperature limit for termination free cooling"),
- r("FREE_COOLING_OUTDOOR_NIGHTTIME_DEACTIVATION_LOW_T_LIMIT", DataType.I16, RegisterType.ReadWrite, 4104, 70, 300, "Lowest night temperature limit for termination free cooling"),
- r("FREE_COOLING_ROOM_CANCEL_T", DataType.I16, RegisterType.ReadWrite, 4105, 120, 300, "Lowest temperature room temperature for termination of free cooling"),
- r("FREE_COOLING_START_TIME_H", DataType.U16, RegisterType.ReadWrite, 4106, undefined, undefined, "Start time of free cooling night-period, hour. Valid range is from 0 to 8 and from 21 to 23."),
- r("FREE_COOLING_START_TIME_M", DataType.U16, RegisterType.ReadWrite, 4107, 0, 59, "Start time of free cooling night-period, Minute"),
- r("FREE_COOLING_END_TIME_H", DataType.U16, RegisterType.ReadWrite, 4108, undefined, undefined, "End time of free cooling night-period, hour. Valid range is from 0 to 8 and from 21 to 23."),
- r("FREE_COOLING_END_TIME_M", DataType.U16, RegisterType.ReadWrite, 4109, 0, 59, "End time of free cooling night-period, Minute"),
- r("FREE_COOLING_ACTIVE", DataType.U16, RegisterType.ReadOnly, 4111, 0, 1, "Indicates if free cooling is being performed"),
- r("FREE_COOLING_MIN_SPEED_LEVEL_SAF", DataType.U16, RegisterType.ReadWrite, 4112, 3, 5, "Minimum speed level during free cooling, SAF.\n3: Normal\n4: High\n5: Maximum"),
- r("FREE_COOLING_MIN_SPEED_LEVEL_EAF", DataType.U16, RegisterType.ReadWrite, 4113, 3, 5, "Minimum speed level during free cooling, EAF.\n3: Normal\n4: High\n5: Maximum"),
- r("WS_T_OFFSET_ACTIVE", DataType.I16, RegisterType.ReadWrite, 5001, -100, 0, "Temperature offset during active week schedule."),
- r("WS_T_OFFSET_INACTIVE", DataType.I16, RegisterType.ReadWrite, 5002, -100, 0, "Temperature offset during inactive week schedule."),
- r("WS_DAY1_PRD1_START_H", DataType.U16, RegisterType.ReadWrite, 5003, 0, 23, "Monday, Period 1, start"),
- r("WS_DAY1_PRD1_START_M", DataType.U16, RegisterType.ReadWrite, 5004, 0, 59, ""),
- r("WS_DAY1_PRD1_END_H", DataType.U16, RegisterType.ReadWrite, 5005, 0, 23, "Monday, Period 1, end"),
- r("WS_DAY1_PRD1_END_M", DataType.U16, RegisterType.ReadWrite, 5006, 0, 59, ""),
- r("WS_DAY1_PRD2_START_H", DataType.U16, RegisterType.ReadWrite, 5007, 0, 23, "Monday, Period 2, start"),
- r("WS_DAY1_PRD2_START_M", DataType.U16, RegisterType.ReadWrite, 5008, 0, 59, ""),
- r("WS_DAY1_PRD2_END_H", DataType.U16, RegisterType.ReadWrite, 5009, 0, 23, "Monday, Period 2, end"),
- r("WS_DAY1_PRD2_END_M", DataType.U16, RegisterType.ReadWrite, 5010, 0, 59, ""),
- r("WS_DAY2_PRD1_START_H", DataType.U16, RegisterType.ReadWrite, 5011, 0, 23, "Tuesday, Period 1, start"),
- r("WS_DAY2_PRD1_START_M", DataType.U16, RegisterType.ReadWrite, 5012, 0, 59, ""),
- r("WS_DAY2_PRD1_END_H", DataType.U16, RegisterType.ReadWrite, 5013, 0, 23, "Tuesday, Period 1, end"),
- r("WS_DAY2_PRD1_END_M", DataType.U16, RegisterType.ReadWrite, 5014, 0, 59, ""),
- r("WS_DAY2_PRD2_START_H", DataType.U16, RegisterType.ReadWrite, 5015, 0, 23, "Tuesday, Period 2, start"),
- r("WS_DAY2_PRD2_START_M", DataType.U16, RegisterType.ReadWrite, 5016, 0, 59, ""),
- r("WS_DAY2_PRD2_END_H", DataType.U16, RegisterType.ReadWrite, 5017, 0, 23, "Tuesday, Period 2, end"),
- r("WS_DAY2_PRD2_END_M", DataType.U16, RegisterType.ReadWrite, 5018, 0, 59, ""),
- r("WS_DAY3_PRD1_START_H", DataType.U16, RegisterType.ReadWrite, 5019, 0, 23, "Wednesday, Period 1, start"),
- r("WS_DAY3_PRD1_START_M", DataType.U16, RegisterType.ReadWrite, 5020, 0, 59, ""),
- r("WS_DAY3_PRD1_END_H", DataType.U16, RegisterType.ReadWrite, 5021, 0, 23, "Wednesday, Period 1, end"),
- r("WS_DAY3_PRD1_END_M", DataType.U16, RegisterType.ReadWrite, 5022, 0, 59, ""),
- r("WS_DAY3_PRD1_END_M", DataType.U16, RegisterType.ReadWrite, 5022, 0, 59, ""),
- r("WS_DAY3_PRD2_START_H", DataType.U16, RegisterType.ReadWrite, 5023, 0, 23, "Wednesday, Period 2, start"),
- r("WS_DAY3_PRD2_START_H", DataType.U16, RegisterType.ReadWrite, 5023, 0, 23, "Wednesday, Period 2, start"),
- r("WS_DAY3_PRD2_START_M", DataType.U16, RegisterType.ReadWrite, 5024, 0, 59, ""),
- r("WS_DAY3_PRD2_START_M", DataType.U16, RegisterType.ReadWrite, 5024, 0, 59, ""),
- r("WS_DAY3_PRD2_END_H", DataType.U16, RegisterType.ReadWrite, 5025, 0, 23, "Wednesday, Period 2, end"),
- r("WS_DAY3_PRD2_END_H", DataType.U16, RegisterType.ReadWrite, 5025, 0, 23, "Wednesday, Period 2, end"),
- r("WS_DAY3_PRD2_END_M", DataType.U16, RegisterType.ReadWrite, 5026, 0, 59, ""),
- r("WS_DAY3_PRD2_END_M", DataType.U16, RegisterType.ReadWrite, 5026, 0, 59, ""),
- r("WS_DAY4_PRD1_START_H", DataType.U16, RegisterType.ReadWrite, 5027, 0, 23, "Thursday, Period 1, start"),
- r("WS_DAY4_PRD1_START_H", DataType.U16, RegisterType.ReadWrite, 5027, 0, 23, "Thursday, Period 1, start"),
- r("WS_DAY4_PRD1_START_M", DataType.U16, RegisterType.ReadWrite, 5028, 0, 59, ""),
- r("WS_DAY4_PRD1_START_M", DataType.U16, RegisterType.ReadWrite, 5028, 0, 59, ""),
- r("WS_DAY4_PRD1_END_H", DataType.U16, RegisterType.ReadWrite, 5029, 0, 23, "Thursday, Period 1, end"),
- r("WS_DAY4_PRD1_END_H", DataType.U16, RegisterType.ReadWrite, 5029, 0, 23, "Thursday, Period 1, end"),
- r("WS_DAY4_PRD1_END_M", DataType.U16, RegisterType.ReadWrite, 5030, 0, 59, ""),
- r("WS_DAY4_PRD1_END_M", DataType.U16, RegisterType.ReadWrite, 5030, 0, 59, ""),
- r("WS_DAY4_PRD2_START_H", DataType.U16, RegisterType.ReadWrite, 5031, 0, 23, "Thursday, Period 2, start"),
- r("WS_DAY4_PRD2_START_H", DataType.U16, RegisterType.ReadWrite, 5031, 0, 23, "Thursday, Period 2, start"),
- r("WS_DAY4_PRD2_START_M", DataType.U16, RegisterType.ReadWrite, 5032, 0, 59, ""),
- r("WS_DAY4_PRD2_START_M", DataType.U16, RegisterType.ReadWrite, 5032, 0, 59, ""),
- r("WS_DAY4_PRD2_END_H", DataType.U16, RegisterType.ReadWrite, 5033, 0, 23, "Thursday, Period 2, end"),
- r("WS_DAY4_PRD2_END_H", DataType.U16, RegisterType.ReadWrite, 5033, 0, 23, "Thursday, Period 2, end"),
- r("WS_DAY4_PRD2_END_M", DataType.U16, RegisterType.ReadWrite, 5034, 0, 59, ""),
- r("WS_DAY4_PRD2_END_M", DataType.U16, RegisterType.ReadWrite, 5034, 0, 59, ""),
- r("WS_DAY5_PRD1_START_H", DataType.U16, RegisterType.ReadWrite, 5035, 0, 23, "Friday, Period 1, start"),
- r("WS_DAY5_PRD1_START_H", DataType.U16, RegisterType.ReadWrite, 5035, 0, 23, "Friday, Period 1, start"),
- r("WS_DAY5_PRD1_START_M", DataType.U16, RegisterType.ReadWrite, 5036, 0, 59, ""),
- r("WS_DAY5_PRD1_START_M", DataType.U16, RegisterType.ReadWrite, 5036, 0, 59, ""),
- r("WS_DAY5_PRD1_END_H", DataType.U16, RegisterType.ReadWrite, 5037, 0, 23, "Friday, Period 1, end"),
- r("WS_DAY5_PRD1_END_H", DataType.U16, RegisterType.ReadWrite, 5037, 0, 23, "Friday, Period 1, end"),
- r("WS_DAY5_PRD1_END_M", DataType.U16, RegisterType.ReadWrite, 5038, 0, 59, ""),
- r("WS_DAY5_PRD1_END_M", DataType.U16, RegisterType.ReadWrite, 5038, 0, 59, ""),
- r("WS_DAY5_PRD2_START_H", DataType.U16, RegisterType.ReadWrite, 5039, 0, 23, "Friday, Period 2, start"),
- r("WS_DAY5_PRD2_START_H", DataType.U16, RegisterType.ReadWrite, 5039, 0, 23, "Friday, Period 2, start"),
- r("WS_DAY5_PRD2_START_M", DataType.U16, RegisterType.ReadWrite, 5040, 0, 59, ""),
- r("WS_DAY5_PRD2_START_M", DataType.U16, RegisterType.ReadWrite, 5040, 0, 59, ""),
- r("WS_DAY5_PRD2_END_H", DataType.U16, RegisterType.ReadWrite, 5041, 0, 23, "Friday, Period 2, end"),
- r("WS_DAY5_PRD2_END_H", DataType.U16, RegisterType.ReadWrite, 5041, 0, 23, "Friday, Period 2, end"),
- r("WS_DAY5_PRD2_END_M", DataType.U16, RegisterType.ReadWrite, 5042, 0, 59, ""),
- r("WS_DAY5_PRD2_END_M", DataType.U16, RegisterType.ReadWrite, 5042, 0, 59, ""),
- r("WS_DAY6_PRD1_START_H", DataType.U16, RegisterType.ReadWrite, 5043, 0, 23, "Saturday, Period 1, start"),
- r("WS_DAY6_PRD1_START_H", DataType.U16, RegisterType.ReadWrite, 5043, 0, 23, "Saturday, Period 1, start"),
- r("WS_DAY6_PRD1_START_M", DataType.U16, RegisterType.ReadWrite, 5044, 0, 59, ""),
- r("WS_DAY6_PRD1_START_M", DataType.U16, RegisterType.ReadWrite, 5044, 0, 59, ""),
- r("WS_DAY6_PRD1_END_H", DataType.U16, RegisterType.ReadWrite, 5045, 0, 23, "Saturday, Period 1, end"),
- r("WS_DAY6_PRD1_END_H", DataType.U16, RegisterType.ReadWrite, 5045, 0, 23, "Saturday, Period 1, end"),
- r("WS_DAY6_PRD1_END_M", DataType.U16, RegisterType.ReadWrite, 5046, 0, 59, ""),
- r("WS_DAY6_PRD1_END_M", DataType.U16, RegisterType.ReadWrite, 5046, 0, 59, ""),
- r("WS_DAY6_PRD2_START_H", DataType.U16, RegisterType.ReadWrite, 5047, 0, 23, "Saturday, Period 2, start"),
- r("WS_DAY6_PRD2_START_H", DataType.U16, RegisterType.ReadWrite, 5047, 0, 23, "Saturday, Period 2, start"),
- r("WS_DAY6_PRD2_START_M", DataType.U16, RegisterType.ReadWrite, 5048, 0, 59, ""),
- r("WS_DAY6_PRD2_START_M", DataType.U16, RegisterType.ReadWrite, 5048, 0, 59, ""),
- r("WS_DAY6_PRD2_END_H", DataType.U16, RegisterType.ReadWrite, 5049, 0, 23, "Saturday, Period 2, end"),
- r("WS_DAY6_PRD2_END_H", DataType.U16, RegisterType.ReadWrite, 5049, 0, 23, "Saturday, Period 2, end"),
- r("WS_DAY6_PRD2_END_M", DataType.U16, RegisterType.ReadWrite, 5050, 0, 59, ""),
- r("WS_DAY6_PRD2_END_M", DataType.U16, RegisterType.ReadWrite, 5050, 0, 59, ""),
- r("WS_DAY7_PRD1_START_H", DataType.U16, RegisterType.ReadWrite, 5051, 0, 23, "Sunday, Period 1, start"),
- r("WS_DAY7_PRD1_START_H", DataType.U16, RegisterType.ReadWrite, 5051, 0, 23, "Sunday, Period 1, start"),
- r("WS_DAY7_PRD1_START_M", DataType.U16, RegisterType.ReadWrite, 5052, 0, 59, ""),
- r("WS_DAY7_PRD1_END_H", DataType.U16, RegisterType.ReadWrite, 5053, 0, 23, "Sunday, Period 1, end"),
- r("WS_DAY7_PRD1_END_M", DataType.U16, RegisterType.ReadWrite, 5054, 0, 59, ""),
- r("WS_DAY7_PRD2_START_H", DataType.U16, RegisterType.ReadWrite, 5055, 0, 23, "Sunday, Period 2, start"),
- r("WS_DAY7_PRD2_START_M", DataType.U16, RegisterType.ReadWrite, 5056, 0, 59, ""),
- r("WS_DAY7_PRD2_END_H", DataType.U16, RegisterType.ReadWrite, 5057, 0, 23, "Sunday, Period 2, end"),
- r("WS_DAY7_PRD2_END_M", DataType.U16, RegisterType.ReadWrite, 5058, 0, 59, ""),
- r("WS_ACTIVE", DataType.U16, RegisterType.ReadOnly, 5059, 0, 1, "Indicates that the current time lays within the indicated intervals"),
- r("WS_FAN_LEVEL_SCHEDULED", DataType.U16, RegisterType.ReadWrite, 5060, 1, 5, "Fan speed levels for SAF and EAF during active week schedule.\n1: Off(1)\n2: Low\n3: Normal\n4: High\n5: Demand(2)\n(1): Off available if Manual Fan Stop is enabled.\n(2): Demand available if demand control active or external fan control enabled."),
- r("WS_FAN_LEVEL_UNSCHEDULED", DataType.U16, RegisterType.ReadWrite, 5061, 1, 5, "Fan speed levels for SAF and EAF during inactive week schedule.\n1: Off(1)\n2: Low\n3: Normal\n4: High\n5: Demand(2)\n(1): Off available if Manual Fan Stop is enabled.\n(2): Demand available if demand control active or external fan control enabled."),
- r("WS_DAY1_PRD1_ENABLED", DataType.U16, RegisterType.ReadWrite, 5101, 0, 1, "Flag indicating if this period is enabled."),
- r("WS_DAY1_PRD2_ENABLED", DataType.U16, RegisterType.ReadWrite, 5102, 0, 1, "Flag indicating if this period is enabled."),
- r("WS_DAY2_PRD1_ENABLED", DataType.U16, RegisterType.ReadWrite, 5103, 0, 1, "Flag indicating if this period is enabled."),
- r("WS_DAY2_PRD2_ENABLED", DataType.U16, RegisterType.ReadWrite, 5104, 0, 1, "Flag indicating if this period is enabled."),
- r("WS_DAY3_PRD1_ENABLED", DataType.U16, RegisterType.ReadWrite, 5105, 0, 1, "Flag indicating if this period is enabled."),
- r("WS_DAY3_PRD2_ENABLED", DataType.U16, RegisterType.ReadWrite, 5106, 0, 1, "Flag indicating if this period is enabled."),
- r("WS_DAY4_PRD1_ENABLED", DataType.U16, RegisterType.ReadWrite, 5107, 0, 1, "Flag indicating if this period is enabled."),
- r("WS_DAY4_PRD2_ENABLED", DataType.U16, RegisterType.ReadWrite, 5108, 0, 1, "Flag indicating if this period is enabled."),
- r("WS_DAY5_PRD1_ENABLED", DataType.U16, RegisterType.ReadWrite, 5109, 0, 1, "Flag indicating if this period is enabled."),
- r("WS_DAY5_PRD2_ENABLED", DataType.U16, RegisterType.ReadWrite, 5110, 0, 1, "Flag indicating if this period is enabled."),
- r("WS_DAY6_PRD1_ENABLED", DataType.U16, RegisterType.ReadWrite, 5111, 0, 1, "Flag indicating if this period is enabled."),
- r("WS_DAY6_PRD2_ENABLED", DataType.U16, RegisterType.ReadWrite, 5112, 0, 1, "Flag indicating if this period is enabled."),
- r("WS_DAY7_PRD1_ENABLED", DataType.U16, RegisterType.ReadWrite, 5113, 0, 1, "Flag indicating if this period is enabled."),
- r("WS_DAY7_PRD2_ENABLED", DataType.U16, RegisterType.ReadWrite, 5114, 0, 1, "Flag indicating if this period is enabled."),
- r("TIME_YEAR", DataType.U16, RegisterType.ReadWrite, 6001, 0, 2999, "Current time"),
- r("TIME_MONTH", DataType.U16, RegisterType.ReadWrite, 6002, 1, 12, "Current time"),
- r("TIME_DAY", DataType.U16, RegisterType.ReadWrite, 6003, 1, 31, "Current time"),
- r("TIME_HOUR", DataType.U16, RegisterType.ReadWrite, 6004, 0, 23, "Current time"),
- r("TIME_MINUTE", DataType.U16, RegisterType.ReadWrite, 6005, 0, 59, "Current time"),
- r("TIME_SECOND", DataType.U16, RegisterType.ReadWrite, 6006, 0, 59, "Current time"),
- r("TIME_AUTO_SUM_WIN", DataType.U16, RegisterType.ReadWrite, 6007, 0, 1, "Flag indicating if DST is enabled.\n0: Daylight saving time not enabled\n1: Daylight saving time enabled"),
- r("HOUR_FORMAT", DataType.U16, RegisterType.ReadWrite, 6008, 0, 1, "Indicaties the presentation of time in the HMI. 24H/12H"),
- r("DAY_OF_THE_WEEK", DataType.U16, RegisterType.ReadOnly, 6009, 0, 6, "Monday (0)...Sunday (6)"),
- r("DST_PERIOD_ACTIVE", DataType.U16, RegisterType.ReadOnly, 6010, 0, 1, ""),
- r("TIME_RTC_SECONDS_L", DataType.U16, RegisterType.ReadOnly, 6011, undefined, undefined, "Now time in seconds. Lower 16 bits."),
- r("TIME_RTC_SECONDS_H", DataType.U16, RegisterType.ReadOnly, 6012, undefined, undefined, "Now time in seconds. Higher 16 bits."),
- r("SYSTEM_START_UP_TIME_L", DataType.U16, RegisterType.ReadOnly, 6021, undefined, undefined, ""),
- r("SYSTEM_START_UP_TIME_H", DataType.U16, RegisterType.ReadOnly, 6022, undefined, undefined, ""),
- r("TIME_RTC", DataType.U16, RegisterType.ReadOnly, 6101, undefined, undefined, "RTC value in seconds, highest 16 bits"),
- r("FILTER_PERIOD", DataType.U16, RegisterType.ReadWrite, 7001, 3, 15, "Filter replacement time in months"),
- r("FILTER_REPLACEMENT_TIME_L", DataType.U16, RegisterType.ReadWrite, 7002, undefined, undefined, "Timestamp of latest filter replcement, lower 16 bits"),
- r("FILTER_REPLACEMENT_TIME_H", DataType.U16, RegisterType.ReadWrite, 7003, undefined, undefined, "Timestamp of latest filter replcement, higher 16 bits"),
- r("FILTER_PERIOD_SET", DataType.U16, RegisterType.ReadOnly, 7004, undefined, undefined, "Indicates that the LastFilterReplacementTime shall be set Now."),
- r("FILTER_REMAINING_TIME_L", DataType.U16, RegisterType.ReadOnly, 7005, undefined, undefined, "Remaining filter time in seconds, lower 16 bits."),
- r("FILTER_REMAINING_TIME_H", DataType.U16, RegisterType.ReadOnly, 7006, undefined, undefined, "Remaining filter time in seconds, higher 16 bits."),
- r("FILTER_ALARM_WAS_DETECTED", DataType.U16, RegisterType.ReadOnly, 7007, undefined, undefined, "Indicates if the filter warning alarm wasgenerated."),
- r("SYSTEM_UNIT_FLOW", DataType.U16, RegisterType.ReadWrite, 9001, 0, 2, "Unit for CAV control mode.\n0: l/s 1: m3/h2:cfm"),
- r("SYSTEM_UNIT_PRESSURE", DataType.U16, RegisterType.ReadWrite, 9002, 0, 1, "Units for VAV control mode.\n0: Pa 1: InH2O"),
- r("SYSTEM_UNIT_TEMPERATURE", DataType.U16, RegisterType.ReadWrite, 9003, 0, 1, "Units for temperature.\n0: Celcius\n1: Fahrenheit"),
- r("DI_CONNECTION_1", DataType.U16, RegisterType.ReadWrite, 11401, 0, 18, "Indicates what kind of DI functionality is connected to DI1.\n0: None /Away/BYP/Vacuum Cleaner/Cooker Hood/Crowded/EMT/External Stop/Extra Controller Alarm/Fireplace/Holiday/Refresh/RGS/Change Over Feedback/ 14: Fire Alarm/Configurable DI1/Configurable DI2/Configurable DI3/ 18: Pressure Guard"),
- r("DI_CONNECTION_2", DataType.U16, RegisterType.ReadWrite, 11402, 0, 18, "Indicates what kind of DI functionality is connected to DI1.\n0: None /Away/BYP/Vacuum Cleaner/Cooker Hood/Crowded/EMT/External Stop/Extra Controller Alarm/Fireplace/Holiday/Refresh/RGS/Change Over Feedback/ 14: Fire Alarm/Configurable DI1/Configurable DI2/Configurable DI3/ 18: Pressure Guard"),
- r("DI_CFG_POLARITY_1", DataType.U16, RegisterType.ReadWrite, 11421, 0, 1, "Polarity of DI1.\n0: NO\n1: NC"),
- r("DI_CFG_POLARITY_2", DataType.U16, RegisterType.ReadWrite, 11422, 0, 1, "Polarity of DI1.\n0: NO\n1: NC"),
- r("INPUT_ANALOG_UI_1", DataType.U16, RegisterType.ReadWrite, 12011, undefined, undefined, "mV"),
- r("INPUT_ANALOG_UI_2", DataType.U16, RegisterType.ReadWrite, 12012, undefined, undefined, "mV"),
- r("INPUT_ANALOG_UI_3", DataType.U16, RegisterType.ReadWrite, 12013, undefined, undefined, "mV"),
- r("INPUT_ANALOG_UI_4", DataType.U16, RegisterType.ReadWrite, 12014, undefined, undefined, "mV"),
- r("INPUT_ANALOG_UI_5", DataType.U16, RegisterType.ReadWrite, 12015, undefined, undefined, "mV"),
- r("INPUT_ANALOG_UI_6", DataType.U16, RegisterType.ReadOnly, 12016, undefined, undefined, "mV"),
- r("INPUT_ANALOG_UI_6", DataType.U16, RegisterType.ReadOnly, 12016, undefined, undefined, "mV"),
- r("INPUT_DIGITAL_UI_1", DataType.U16, RegisterType.ReadWrite, 12021, 0, 1, "State of UI1"),
- r("INPUT_DIGITAL_UI_1", DataType.U16, RegisterType.ReadWrite, 12021, 0, 1, "State of UI1"),
- r("INPUT_DIGITAL_UI_2", DataType.U16, RegisterType.ReadWrite, 12022, 0, 1, "State of UI2"),
- r("INPUT_DIGITAL_UI_2", DataType.U16, RegisterType.ReadWrite, 12022, 0, 1, "State of UI2"),
- r("INPUT_DIGITAL_UI_3", DataType.U16, RegisterType.ReadWrite, 12023, 0, 1, "State of UI3"),
- r("INPUT_DIGITAL_UI_3", DataType.U16, RegisterType.ReadWrite, 12023, 0, 1, "State of UI3"),
- r("INPUT_DIGITAL_UI_4", DataType.U16, RegisterType.ReadWrite, 12024, 0, 1, "State of UI4"),
- r("INPUT_DIGITAL_UI_4", DataType.U16, RegisterType.ReadWrite, 12024, 0, 1, "State of UI4"),
- r("INPUT_DIGITAL_UI_5", DataType.U16, RegisterType.ReadWrite, 12025, 0, 1, "State of UI5"),
- r("INPUT_DIGITAL_UI_5", DataType.U16, RegisterType.ReadWrite, 12025, 0, 1, "State of UI5"),
- r("INPUT_DIGITAL_UI_6", DataType.U16, RegisterType.ReadOnly, 12026, undefined, undefined, "State of UI6"),
- r("INPUT_DIGITAL_UI_6", DataType.U16, RegisterType.ReadOnly, 12026, undefined, undefined, "State of UI6"),
- r("INPUT_DIGITAL_DI_1", DataType.U16, RegisterType.ReadOnly, 12031, 0, 1, "Boolean"),
- r("INPUT_DIGITAL_DI_2", DataType.U16, RegisterType.ReadOnly, 12032, 0, 1, "Boolean"),
- r("SENSOR_FPT", DataType.I16, RegisterType.ReadWrite, 12101, -400, 800, "Frost Protection Temperature sensor value (Water Heater)"),
- r("SENSOR_OAT", DataType.I16, RegisterType.ReadWrite, 12102, -400, 800, "Outdoor Air Temperature sensor (standard)"),
- r("SENSOR_SAT", DataType.I16, RegisterType.ReadWrite, 12103, -400, 800, "Supply Air Temperature sensor (standard)"),
- r("SENSOR_RAT", DataType.I16, RegisterType.ReadWrite, 12104, -400, 800, "Room Air Temperature sensor (accessory)"),
- r("SENSOR_EAT", DataType.I16, RegisterType.ReadWrite, 12105, -400, 800, "Extract Air Temperature sensor (accessory)"),
- r("SENSOR_ECT", DataType.I16, RegisterType.ReadWrite, 12106, -400, 800, "Extra Controller Temperature sensor (accessory)"),
- r("SENSOR_EFT", DataType.I16, RegisterType.ReadWrite, 12107, -400, 800, "Efficiency temperature sensor (accessory)"),
- r("SENSOR_OHT", DataType.I16, RegisterType.ReadWrite, 12108, -400, 800, "Over Heat Temperature sensor (Electrical Heater)"),
- r("SENSOR_RHS", DataType.U16, RegisterType.ReadWrite, 12109, 0, 100, "Relative Humidity Sensor (Accessory)"),
- r("SENSOR_RGS", DataType.U16, RegisterType.ReadOnly, 12112, 0, 1, "Rotating guard Sensor input"),
- r("SENSOR_RGS", DataType.U16, RegisterType.ReadOnly, 12112, 0, 1, "Rotating guard Sensor input"),
- r("SENSOR_CO2S", DataType.U16, RegisterType.ReadWrite, 12115, 0, 2000, "CO2 value (accessory)"),
- r("SENSOR_RHS_PDM", DataType.U16, RegisterType.ReadWrite, 12136, 0, 100, "PDM RHS sensor value (standard)"),
- r("SENSOR_CO2S_1", DataType.U16, RegisterType.ReadWrite, 12151, 0, 2000, "CO2 sensor value - UI1 (accessory)"),
- r("SENSOR_CO2S_2", DataType.U16, RegisterType.ReadWrite, 12152, 0, 2000, "CO2 sensor value - UI2 (accessory)"),
- r("SENSOR_CO2S_3", DataType.U16, RegisterType.ReadWrite, 12153, 0, 2000, "CO2 sensor value - UI3 (accessory)"),
- r("SENSOR_CO2S_4", DataType.U16, RegisterType.ReadWrite, 12154, 0, 2000, "CO2 sensor value - UI4 (accessory)"),
- r("SENSOR_CO2S_5", DataType.U16, RegisterType.ReadWrite, 12155, 0, 2000, "CO2 sensor value - UI5 (accessory)"),
- r("SENSOR_CO2S_6", DataType.U16, RegisterType.ReadOnly, 12156, undefined, undefined, "CO2 sensor value - UI6 (accessory)"),
- r("SENSOR_RHS_1", DataType.U16, RegisterType.ReadWrite, 12161, 0, 100, "RH sensor value - UI1 (accessory)"),
- r("SENSOR_RHS_2", DataType.U16, RegisterType.ReadWrite, 12162, 0, 100, "RH sensor value - UI2 (accessory)"),
- r("SENSOR_RHS_3", DataType.U16, RegisterType.ReadWrite, 12163, 0, 100, "RH sensor value - UI3 (accessory)"),
- r("SENSOR_RHS_4", DataType.U16, RegisterType.ReadWrite, 12164, 0, 100, "RH sensor value - UI4 (accessory)"),
- r("SENSOR_RHS_5", DataType.U16, RegisterType.ReadWrite, 12165, 0, 100, "RH sensor value - UI5 (accessory)"),
- r("SENSOR_RHS_6", DataType.U16, RegisterType.ReadOnly, 12166, 0, 100, "RH sensor value - UI6 (accessory)"),
- r("SENSOR_DI_AWAY", DataType.U16, RegisterType.ReadOnly, 12301, 0, 1, "Value of physical Digital Input of Away function"),
- r("SENSOR_DI_HOLIDAY", DataType.U16, RegisterType.ReadOnly, 12302, 0, 1, "Value of physical Digital Input of Holiday function"),
- r("SENSOR_DI_FIREPLACE", DataType.U16, RegisterType.ReadOnly, 12303, 0, 1, "Value of physical Digital Input of Fireplace function"),
- r("SENSOR_DI_REHRESH", DataType.U16, RegisterType.ReadOnly, 12304, 0, 1, "Value of physical Digital Input of Refresh function"),
- r("SENSOR_DI_CROWDED", DataType.U16, RegisterType.ReadOnly, 12305, 0, 1, "Value of physical Digital Input of Crowded function"),
- r("SENSOR_DI_COOKERHOOD", DataType.U16, RegisterType.ReadOnly, 12306, 0, 1, "Value of physical Digital Input of Cookerhood function"),
- r("SENSOR_DI_VACUUMCLEANER", DataType.U16, RegisterType.ReadOnly, 12307, 0, 1, "Value of physical Digital Input of Vacuum Cleaner function"),
- r("SENSOR_DI_EXTERNAL_STOP", DataType.U16, RegisterType.ReadOnly, 12308, 0, 1, "External Stop input value"),
- r("SENSOR_DI_LOAD_DETECTED", DataType.U16, RegisterType.ReadOnly, 12309, 0, 1, "Load Detected input value"),
- r("SENSOR_DI_EXTRA_CONTROLLER_EMT", DataType.U16, RegisterType.ReadOnly, 12310, 0, 1, "Extra controller EMT input value"),
- r("SENSOR_DI_FIRE_ALARM", DataType.U16, RegisterType.ReadOnly, 12311, 0, 1, "Fire Alarm input value"),
- r("SENSOR_DI_CHANGE_OVER_FEEDBACK", DataType.U16, RegisterType.ReadOnly, 12312, 0, 1, "Change over feedback value"),
- r("SENSOR_DI_PRESSURE_GUARD", DataType.U16, RegisterType.ReadOnly, 12316, 0, 1, "Indicates if physical DI is active"),
- r("SENSOR_DI_CDI_1", DataType.U16, RegisterType.ReadOnly, 12317, 0, 1, "Indicates if physical DI is active"),
- r("SENSOR_DI_CDI_2", DataType.U16, RegisterType.ReadOnly, 12318, 0, 1, "Indicates if physical DI is active"),
- r("SENSOR_DI_CDI_3", DataType.U16, RegisterType.ReadOnly, 12319, 0, 1, "Indicates if physical DI is active"),
- r("SENSOR_RPM_SAF", DataType.U16, RegisterType.ReadOnly, 12401, 0, 5000, "Supply Air Fan RPM indication from TACHO"),
- r("SENSOR_RPM_EAF", DataType.U16, RegisterType.ReadOnly, 12402, 0, 5000, "Extract Air Fan RPM indication from TACHO"),
- r("SENSOR_FLOW_PIGGYBACK_SAF", DataType.U16, RegisterType.ReadOnly, 12403, undefined, undefined, "Flow value calculated from piggyback pressure sensor."),
- r("SENSOR_FLOW_PIGGYBACK_EAF", DataType.U16, RegisterType.ReadOnly, 12404, undefined, undefined, "Flow value calculated from piggyback pressure sensor."),
- r("SENSOR_DI_BYF", DataType.U16, RegisterType.ReadOnly, 12405, undefined, undefined, "Value from Bypass Damper Feedback input.In %."),
- r("SENSOR_PDM_EAT_VALUE", DataType.U16, RegisterType.ReadWrite, 12544, -400, 800, "PDM EAT sensor value (standard)"),
- r("MANUAL_OVERRIDE_F_INPUT_UI_RH_MODE", DataType.U16, RegisterType.ReadWrite, 12931, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_F_INPUT_UI_CO2_MODE", DataType.U16, RegisterType.ReadWrite, 12932, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_F_INPUT_OAT_MODE", DataType.U16, RegisterType.ReadWrite, 12933, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_F_INPUT_SAT_MODE", DataType.U16, RegisterType.ReadWrite, 12934, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_F_INPUT_OHT_MODE", DataType.U16, RegisterType.ReadWrite, 12935, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_F_INPUT_FPT_MODE", DataType.U16, RegisterType.ReadWrite, 12936, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_F_INPUT_RAT_MODE", DataType.U16, RegisterType.ReadWrite, 12937, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_F_INPUT_EAT_MODE", DataType.U16, RegisterType.ReadWrite, 12938, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_F_INPUT_ECT_MODE", DataType.U16, RegisterType.ReadWrite, 12939, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_F_INPUT_EFT_MODE", DataType.U16, RegisterType.ReadWrite, 12940, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_F_INPUT_PDM_RH_MODE", DataType.U16, RegisterType.ReadWrite, 12941, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_F_INPUT_PDM_T_MODE", DataType.U16, RegisterType.ReadWrite, 12942, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_INPUT_SAF_RPM_MODE", DataType.U16, RegisterType.ReadWrite, 12943, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_INPUT_EAF_RPM_MODE", DataType.U16, RegisterType.ReadWrite, 12944, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_INPUT_UI6_MODE", DataType.U16, RegisterType.ReadWrite, 12945, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_INPUT_BYF_MODE", DataType.U16, RegisterType.ReadWrite, 12946, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_INPUT_PIGGYBACK1_SAF_P_MODE", DataType.U16, RegisterType.ReadWrite, 12947, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_INPUT_PIGGYBACK1_EAF_P_MODE", DataType.U16, RegisterType.ReadWrite, 12948, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_INPUT_PIGGYBACK2_SAF_P_MODE", DataType.U16, RegisterType.ReadWrite, 12949, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_INPUT_PIGGYBACK2_EAF_P_MODE", DataType.U16, RegisterType.ReadWrite, 12950, 0, 1, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE"),
- r("MANUAL_OVERRIDE_INPUT_AI1_VALUE", DataType.I16, RegisterType.ReadWrite, 12951, -410, 810, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_INPUT_AI2_VALUE", DataType.I16, RegisterType.ReadWrite, 12952, -410, 810, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_INPUT_AI3_VALUE", DataType.I16, RegisterType.ReadWrite, 12953, -410, 810, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_INPUT_AI4_VALUE", DataType.I16, RegisterType.ReadWrite, 12954, -410, 810, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_INPUT_AI5_VALUE", DataType.I16, RegisterType.ReadWrite, 12955, -410, 810, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_INPUT_AI6_VALUE", DataType.I16, RegisterType.ReadWrite, 12956, -410, 810, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_INPUT_AI7_VALUE", DataType.I16, RegisterType.ReadWrite, 12957, -410, 810, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_INPUT_DI1_VALUE", DataType.I16, RegisterType.ReadWrite, 12958, 0, 1, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_INPUT_DI2_VALUE", DataType.I16, RegisterType.ReadWrite, 12959, 0, 1, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_INPUT_UI1_VALUE", DataType.I16, RegisterType.ReadWrite, 12960, 0, 100, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_INPUT_UI2_VALUE", DataType.I16, RegisterType.ReadWrite, 12961, 0, 100, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_INPUT_UI3_VALUE", DataType.I16, RegisterType.ReadWrite, 12962, 0, 100, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_INPUT_UI4_VALUE", DataType.I16, RegisterType.ReadWrite, 12963, 0, 100, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_INPUT_UI5_VALUE", DataType.I16, RegisterType.ReadWrite, 12964, 0, 100, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_F_INPUT_OAT_VALUE", DataType.I16, RegisterType.ReadWrite, 12983, -410, 810, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_F_INPUT_SAT_VALUE", DataType.I16, RegisterType.ReadWrite, 12984, -410, 810, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_F_INPUT_OHT_VALUE", DataType.I16, RegisterType.ReadWrite, 12985, -410, 810, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_F_INPUT_FPT_VALUE", DataType.I16, RegisterType.ReadWrite, 12986, -410, 810, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_F_INPUT_RAT_VALUE", DataType.I16, RegisterType.ReadWrite, 12987, -410, 810, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_F_INPUT_EAT_VALUE", DataType.I16, RegisterType.ReadWrite, 12988, -410, 810, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_F_INPUT_ECT_VALUE", DataType.I16, RegisterType.ReadWrite, 12989, -410, 810, "Value to override the device input with."),
- r("MANUAL_OVERRIDE_F_INPUT_EFT_VALUE", DataType.I16, RegisterType.ReadWrite, 12990, -410, 810, "Value to override the device input with."),
- r("OUTPUT_TRIAC_CONFIGURED", DataType.U16, RegisterType.ReadWrite, 13201, 0, 1, "Indicates if the TRIAC shall be used"),
- r("DO1_AFTER_MUX", DataType.U16, RegisterType.ReadOnly, 13301, 0, 1, "Digital output after multiplexer"),
- r("DO2_AFTER_MUX", DataType.U16, RegisterType.ReadOnly, 13302, 0, 1, "Digital output after multiplexer"),
- r("DO3_AFTER_MUX", DataType.U16, RegisterType.ReadOnly, 13303, 0, 1, "Digital output after multiplexer"),
- r("DO4_AFTER_MUX", DataType.U16, RegisterType.ReadOnly, 13304, 0, 1, "Digital output after multiplexer"),
- r("AO1_AFTER_MUX", DataType.U16, RegisterType.ReadOnly, 13311, 0, 100, "Analog output after multiplexer"),
- r("AO2_AFTER_MUX", DataType.U16, RegisterType.ReadOnly, 13312, 0, 100, "Analog output after multiplexer"),
- r("AO3_AFTER_MUX", DataType.U16, RegisterType.ReadOnly, 13313, 0, 100, "Analog output after multiplexer"),
- r("AO4_AFTER_MUX", DataType.U16, RegisterType.ReadOnly, 13314, 0, 100, "Analog output after multiplexer"),
- r("AO5_AFTER_MUX", DataType.U16, RegisterType.ReadOnly, 13315, 0, 100, "Analog output after multiplexer"),
- r("MANUAL_OVERRIDE_OUTPUT_SAF", DataType.U16, RegisterType.ReadWrite, 13601, 0, 1, "SAF Override.\n0: Auto 1: Manual"),
- r("MANUAL_OVERRIDE_OUTPUT_EAF", DataType.U16, RegisterType.ReadWrite, 13602, 0, 1, "EAF Override.\n0: Auto 1: Manual"),
- r("MANUAL_OVERRIDE_OUTPUT_SAF_VALUE", DataType.U16, RegisterType.ReadWrite, 13801, 0, 100, "SAF Override value in % if manual (1) selected"),
- r("MANUAL_OVERRIDE_OUTPUT_EAF_VALUE", DataType.U16, RegisterType.ReadWrite, 13802, 0, 100, "EAF override value in % if manual (1) selected"),
- r("OUTPUT_SAF", DataType.U16, RegisterType.ReadOnly, 14001, 0, 100, "SAF fan speed"),
- r("OUTPUT_EAF", DataType.U16, RegisterType.ReadOnly, 14002, 0, 100, "EAF fan speed"),
- r("OUTPUT_ALARM", DataType.U16, RegisterType.ReadOnly, 14003, 0, 1, "Sum Alarm DO\n0: Output not active\n1: Output active"),
- r("OUTPUT_OUTDOOR_EXTRACT_DAMPER", DataType.U16, RegisterType.ReadOnly, 14004, 0, 1, "Indicates if Outdoor/Exhaust air dampersignal is On/Off"),
- r("OUTPUT_Y1_ANALOG", DataType.U16, RegisterType.ReadOnly, 14101, 0, 100, "Heater AO state."),
- r("OUTPUT_Y1_DIGITAL", DataType.U16, RegisterType.ReadOnly, 14102, 0, 1, "Heater DO state:\n0: Output not active\n1: Output active"),
- r("OUTPUT_Y2_ANALOG", DataType.U16, RegisterType.ReadOnly, 14103, 0, 100, "Heat Exchanger AO state."),
- r("OUTPUT_Y2_DIGITAL", DataType.U16, RegisterType.ReadOnly, 14104, 0, 1, "Heat Exchanger DO state.\n0: Output notactive\n1: Output active"),
- r("OUTPUT_Y3_ANALOG", DataType.U16, RegisterType.ReadOnly, 14201, 0, 100, "Cooler AO state."),
- r("OUTPUT_Y3_DIGITAL", DataType.U16, RegisterType.ReadOnly, 14202, 0, 1, "Cooler DO state:\n0: Output not active\n1: Output active"),
- r("OUTPUT_Y4_ANALOG", DataType.U16, RegisterType.ReadOnly, 14203, 0, 100, "Extra controller AO state."),
- r("OUTPUT_Y4_DIGITAL", DataType.U16, RegisterType.ReadOnly, 14204, 0, 1, "Extra controller DO state:\n0: Output not active\n1: Output active"),
- r("OUTPUT_Y1_CIRC_PUMP", DataType.U16, RegisterType.ReadOnly, 14301, undefined, undefined, "Heating circulation pump output"),
- r("OUTPUT_Y3_CIRC_PUMP", DataType.U16, RegisterType.ReadOnly, 14302, undefined, undefined, "Cooler circulation pump output"),
- r("OUTPUT_Y1_Y3_CIRC_PUMP", DataType.U16, RegisterType.ReadOnly, 14303, undefined, undefined, "Change-over circulation pump output"),
- r("OUTPUT_Y4_CIRC_PUMP", DataType.U16, RegisterType.ReadOnly, 14304, undefined, undefined, "Extra controller circulation pump output"),
- r("OUTPUT_AO1", DataType.U16, RegisterType.ReadOnly, 14351, undefined, undefined, "Voltage signal from AO1"),
- r("OUTPUT_AO2", DataType.U16, RegisterType.ReadOnly, 14352, undefined, undefined, "Voltage signal from AO2"),
- r("OUTPUT_AO3", DataType.U16, RegisterType.ReadOnly, 14353, undefined, undefined, "Voltage signal from AO3"),
- r("OUTPUT_AO4", DataType.U16, RegisterType.ReadOnly, 14354, undefined, undefined, "Voltage signal from AO4"),
- r("OUTPUT_AO5", DataType.U16, RegisterType.ReadOnly, 14355, undefined, undefined, "Voltage signal from AO5"),
- r("OUTPUT_DO1", DataType.U16, RegisterType.ReadOnly, 14361, 0, 1, "State of DO1"),
- r("OUTPUT_DO2", DataType.U16, RegisterType.ReadOnly, 14362, 0, 1, "State of DO2"),
- r("OUTPUT_DO3", DataType.U16, RegisterType.ReadOnly, 14363, 0, 1, "State of DO3"),
- r("OUTPUT_DO4", DataType.U16, RegisterType.ReadOnly, 14364, 0, 1, "State of DO4"),
- r("OUTPUT_FAN_SPEED1", DataType.U16, RegisterType.ReadOnly, 14371, 0, 100, "Supply air fan control signal in %"),
- r("OUTPUT_FAN_SPEED2", DataType.U16, RegisterType.ReadOnly, 14372, 0, 100, "Extract air fan control signal in %"),
- r("OUTPUT_TRIAC", DataType.U16, RegisterType.ReadOnly, 14381, 0, 1, "TRIAC control signal"),
- r("ALARM_SAF_CTRL_ALARM", DataType.U16, RegisterType.ReadOnly, 15002, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_SAF_CTRL_ALARM", DataType.U16, RegisterType.ReadOnly, 15002, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_SAF_CTRL_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15003, 0, 1, "Signal to clear the alarm"),
- r("ALARM_SAF_CTRL_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15003, 0, 1, "Signal to clear the alarm"),
- r("ALARM_EAF_CTRL_ALARM", DataType.U16, RegisterType.ReadOnly, 15009, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_EAF_CTRL_ALARM", DataType.U16, RegisterType.ReadOnly, 15009, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_EAF_CTRL_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15010, 0, 1, "Signal to clear the alarm"),
- r("ALARM_EAF_CTRL_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15010, 0, 1, "Signal to clear the alarm"),
- r("ALARM_FROST_PROT_ALARM", DataType.U16, RegisterType.ReadOnly, 15016, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_FROST_PROT_ALARM", DataType.U16, RegisterType.ReadOnly, 15016, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_FROST_PROT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15017, 0, 1, "Signal to clear the alarm"),
- r("ALARM_FROST_PROT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15017, 0, 1, "Signal to clear the alarm"),
- r("ALARM_DEFROSTING_ALARM", DataType.U16, RegisterType.ReadOnly, 15023, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_DEFROSTING_ALARM", DataType.U16, RegisterType.ReadOnly, 15023, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_DEFROSTING_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15024, 0, 1, "Signal to clear the alarm"),
- r("ALARM_DEFROSTING_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15024, 0, 1, "Signal to clear the alarm"),
- r("ALARM_SAF_RPM_ALARM", DataType.U16, RegisterType.ReadOnly, 15030, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_SAF_RPM_ALARM", DataType.U16, RegisterType.ReadOnly, 15030, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_SAF_RPM_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15031, 0, 1, "Signal to clear the alarm"),
- r("ALARM_SAF_RPM_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15031, 0, 1, "Signal to clear the alarm"),
- r("ALARM_EAF_RPM_ALARM", DataType.U16, RegisterType.ReadOnly, 15037, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_EAF_RPM_ALARM", DataType.U16, RegisterType.ReadOnly, 15037, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_EAF_RPM_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15038, 0, 1, "Signal to clear the alarm"),
- r("ALARM_EAF_RPM_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15038, 0, 1, "Signal to clear the alarm"),
- r("ALARM_FPT_ALARM", DataType.U16, RegisterType.ReadOnly, 15058, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_FPT_ALARM", DataType.U16, RegisterType.ReadOnly, 15058, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_FPT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15059, 0, 1, "Signal to clear the alarm"),
- r("ALARM_FPT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15059, 0, 1, "Signal to clear the alarm"),
- r("ALARM_OAT_ALARM", DataType.U16, RegisterType.ReadOnly, 15065, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_OAT_ALARM", DataType.U16, RegisterType.ReadOnly, 15065, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_OAT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15066, 0, 1, "Signal to clear the alarm"),
- r("ALARM_OAT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15066, 0, 1, "Signal to clear the alarm"),
- r("ALARM_SAT_ALARM", DataType.U16, RegisterType.ReadOnly, 15072, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_SAT_ALARM", DataType.U16, RegisterType.ReadOnly, 15072, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_SAT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15073, 0, 1, "Signal to clear the alarm"),
- r("ALARM_SAT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15073, 0, 1, "Signal to clear the alarm"),
- r("ALARM_RAT_ALARM", DataType.U16, RegisterType.ReadOnly, 15079, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_RAT_ALARM", DataType.U16, RegisterType.ReadOnly, 15079, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_RAT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15080, 0, 1, "Signal to clear the alarm"),
- r("ALARM_EAT_ALARM", DataType.U16, RegisterType.ReadOnly, 15086, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_EAT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15087, 0, 1, "Signal to clear the alarm"),
- r("ALARM_ECT_ALARM", DataType.U16, RegisterType.ReadOnly, 15093, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_ECT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15094, 0, 1, "Signal to clear the alarm"),
- r("ALARM_EFT_ALARM", DataType.U16, RegisterType.ReadOnly, 15100, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_EFT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15101, 0, 1, "Signal to clear the alarm"),
- r("ALARM_OHT_ALARM", DataType.U16, RegisterType.ReadOnly, 15107, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_OHT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15108, 0, 1, "Signal to clear the alarm"),
- r("ALARM_EMT_ALARM", DataType.U16, RegisterType.ReadOnly, 15114, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_EMT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15115, 0, 1, "Signal to clear the alarm"),
- r("ALARM_RGS_ALARM", DataType.U16, RegisterType.ReadOnly, 15121, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_RGS_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15122, 0, 1, "Signal to clear the alarm"),
- r("ALARM_BYS_ALARM", DataType.U16, RegisterType.ReadOnly, 15128, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_BYS_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15129, 0, 1, "Signal to clear the alarm"),
- r("ALARM_SECONDARY_AIR_ALARM", DataType.U16, RegisterType.ReadOnly, 15135, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_SECONDARY_AIR_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15136, 0, 1, "Signal to clear the alarm"),
- r("ALARM_FILTER_ALARM", DataType.U16, RegisterType.ReadOnly, 15142, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_FILTER_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15143, 0, 1, "Signal to clear the alarm"),
- r("ALARM_EXTRA_CONTROLLER_ALARM", DataType.U16, RegisterType.ReadOnly, 15149, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_EXTRA_CONTROLLER_ALARM", DataType.U16, RegisterType.ReadOnly, 15149, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_EXTRA_CONTROLLER_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15150, 0, 1, "Signal to clear the alarm"),
- r("ALARM_EXTRA_CONTROLLER_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15150, 0, 1, "Signal to clear the alarm"),
- r("ALARM_EXTERNAL_STOP_ALARM", DataType.U16, RegisterType.ReadOnly, 15156, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_EXTERNAL_STOP_ALARM", DataType.U16, RegisterType.ReadOnly, 15156, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_EXTERNAL_STOP_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15157, 0, 1, "Signal to clear the alarm"),
- r("ALARM_EXTERNAL_STOP_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15157, 0, 1, "Signal to clear the alarm"),
- r("ALARM_RH_ALARM", DataType.U16, RegisterType.ReadOnly, 15163, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_RH_ALARM", DataType.U16, RegisterType.ReadOnly, 15163, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_RH_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15164, 0, 1, "Signal to clear the alarm"),
- r("ALARM_RH_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15164, 0, 1, "Signal to clear the alarm"),
- r("ALARM_CO2_ALARM", DataType.U16, RegisterType.ReadOnly, 15170, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_CO2_ALARM", DataType.U16, RegisterType.ReadOnly, 15170, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_CO2_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15171, 0, 1, "Signal to clear the alarm"),
- r("ALARM_CO2_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15171, 0, 1, "Signal to clear the alarm"),
- r("ALARM_LOW_SAT_ALARM", DataType.U16, RegisterType.ReadOnly, 15177, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_LOW_SAT_ALARM", DataType.U16, RegisterType.ReadOnly, 15177, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_LOW_SAT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15178, 0, 1, "Signal to clear the alarm"),
- r("ALARM_LOW_SAT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15178, 0, 1, "Signal to clear the alarm"),
- r("ALARM_BYF_ALARM", DataType.U16, RegisterType.ReadOnly, 15184, undefined, undefined, "Alarm active/inactive\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_BYF_ALARM", DataType.U16, RegisterType.ReadOnly, 15184, undefined, undefined, "Alarm active/inactive\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_BYF_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15185, undefined, 0, "Signal to clear the alarm"),
- r("ALARM_BYF_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15185, undefined, 0, "Signal to clear the alarm"),
- r("ALARM_MANUAL_OVERRIDE_OUTPUTS_ALARM", DataType.U16, RegisterType.ReadOnly, 15502, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_MANUAL_OVERRIDE_OUTPUTS_ALARM", DataType.U16, RegisterType.ReadOnly, 15502, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_MANUAL_OVERRIDE_OUTPUTS_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15503, 0, 1, "Signal to clear the alarm"),
- r("ALARM_MANUAL_OVERRIDE_OUTPUTS_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15503, 0, 1, "Signal to clear the alarm"),
- r("ALARM_PDM_RHS_ALARM", DataType.U16, RegisterType.ReadOnly, 15509, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_PDM_RHS_ALARM", DataType.U16, RegisterType.ReadOnly, 15509, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_PDM_RHS_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15510, 0, 1, "Signal to clear the alarm"),
- r("ALARM_PDM_RHS_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15510, 0, 1, "Signal to clear the alarm"),
- r("ALARM_PDM_EAT_ALARM", DataType.U16, RegisterType.ReadOnly, 15516, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_PDM_EAT_ALARM", DataType.U16, RegisterType.ReadOnly, 15516, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_PDM_EAT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15517, 0, 1, "Signal to clear the alarm"),
- r("ALARM_PDM_EAT_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15517, 0, 1, "Signal to clear the alarm"),
- r("ALARM_MANUAL_FAN_STOP_ALARM", DataType.U16, RegisterType.ReadOnly, 15523, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_MANUAL_FAN_STOP_ALARM", DataType.U16, RegisterType.ReadOnly, 15523, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_MANUAL_FAN_STOP_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15524, 0, 1, "Signal to clear the alarm"),
- r("ALARM_OVERHEAT_TEMPERATURE_ALARM", DataType.U16, RegisterType.ReadOnly, 15530, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_OVERHEAT_TEMPERATURE_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15531, 0, 1, "Signal to clear the alarm"),
- r("ALARM_FIRE_ALARM_ALARM", DataType.U16, RegisterType.ReadOnly, 15537, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_FIRE_ALARM_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15538, 0, 1, "Signal to clear the alarm"),
- r("ALARM_FILTER_WARNING_ALARM", DataType.U16, RegisterType.ReadOnly, 15544, 0, 3, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active"),
- r("ALARM_FILTER_WARNING_CLEAR_ALARM", DataType.U16, RegisterType.ReadWrite, 15545, 0, 1, "Signal to clear the alarm"),
- r("ALARM_FILTER_WARNING_ALARM_ERROR_DURATION_COUNTER", DataType.U16, RegisterType.ReadOnly, 15549, undefined, undefined, "Counter for delay"),
- r("ALARM_LOG_1_ID", DataType.U16, RegisterType.ReadOnly, 15701, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_1_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15702, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_1_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15703, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_1_YEAR", DataType.U16, RegisterType.ReadOnly, 15704, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_1_MONTH", DataType.U16, RegisterType.ReadOnly, 15705, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_1_DAY", DataType.U16, RegisterType.ReadOnly, 15706, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_1_HOUR", DataType.U16, RegisterType.ReadOnly, 15707, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_1_MINUTE", DataType.U16, RegisterType.ReadOnly, 15708, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_1_SECOND", DataType.U16, RegisterType.ReadOnly, 15709, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_1_CODE", DataType.U16, RegisterType.ReadOnly, 15710, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_2_ID", DataType.U16, RegisterType.ReadOnly, 15711, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_2_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15712, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_2_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15713, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_2_YEAR", DataType.U16, RegisterType.ReadOnly, 15714, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_2_MONTH", DataType.U16, RegisterType.ReadOnly, 15715, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_2_DAY", DataType.U16, RegisterType.ReadOnly, 15716, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_2_HOUR", DataType.U16, RegisterType.ReadOnly, 15717, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_2_MINUTE", DataType.U16, RegisterType.ReadOnly, 15718, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_2_SECOND", DataType.U16, RegisterType.ReadOnly, 15719, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_2_CODE", DataType.U16, RegisterType.ReadOnly, 15720, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_3_ID", DataType.U16, RegisterType.ReadOnly, 15721, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_3_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15722, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_3_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15723, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_3_YEAR", DataType.U16, RegisterType.ReadOnly, 15724, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_3_MONTH", DataType.U16, RegisterType.ReadOnly, 15725, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_3_DAY", DataType.U16, RegisterType.ReadOnly, 15726, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_3_HOUR", DataType.U16, RegisterType.ReadOnly, 15727, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_3_MINUTE", DataType.U16, RegisterType.ReadOnly, 15728, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_3_SECOND", DataType.U16, RegisterType.ReadOnly, 15729, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_3_CODE", DataType.U16, RegisterType.ReadOnly, 15730, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_4_ID", DataType.U16, RegisterType.ReadOnly, 15731, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_4_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15732, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_4_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15733, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_4_YEAR", DataType.U16, RegisterType.ReadOnly, 15734, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_4_MONTH", DataType.U16, RegisterType.ReadOnly, 15735, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_4_DAY", DataType.U16, RegisterType.ReadOnly, 15736, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_4_HOUR", DataType.U16, RegisterType.ReadOnly, 15737, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_4_MINUTE", DataType.U16, RegisterType.ReadOnly, 15738, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_4_SECOND", DataType.U16, RegisterType.ReadOnly, 15739, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_4_CODE", DataType.U16, RegisterType.ReadOnly, 15740, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_5_ID", DataType.U16, RegisterType.ReadOnly, 15741, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_5_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15742, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_5_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15743, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_5_YEAR", DataType.U16, RegisterType.ReadOnly, 15744, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_5_MONTH", DataType.U16, RegisterType.ReadOnly, 15745, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_5_DAY", DataType.U16, RegisterType.ReadOnly, 15746, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_5_HOUR", DataType.U16, RegisterType.ReadOnly, 15747, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_5_MINUTE", DataType.U16, RegisterType.ReadOnly, 15748, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_5_SECOND", DataType.U16, RegisterType.ReadOnly, 15749, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_5_CODE", DataType.U16, RegisterType.ReadOnly, 15750, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_6_ID", DataType.U16, RegisterType.ReadOnly, 15751, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_6_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15752, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_6_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15753, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_6_YEAR", DataType.U16, RegisterType.ReadOnly, 15754, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_6_MONTH", DataType.U16, RegisterType.ReadOnly, 15755, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_6_DAY", DataType.U16, RegisterType.ReadOnly, 15756, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_6_HOUR", DataType.U16, RegisterType.ReadOnly, 15757, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_6_MINUTE", DataType.U16, RegisterType.ReadOnly, 15758, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_6_SECOND", DataType.U16, RegisterType.ReadOnly, 15759, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_6_CODE", DataType.U16, RegisterType.ReadOnly, 15760, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_7_ID", DataType.U16, RegisterType.ReadOnly, 15761, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_7_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15762, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_7_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15763, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_7_YEAR", DataType.U16, RegisterType.ReadOnly, 15764, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_7_MONTH", DataType.U16, RegisterType.ReadOnly, 15765, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_7_DAY", DataType.U16, RegisterType.ReadOnly, 15766, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_7_HOUR", DataType.U16, RegisterType.ReadOnly, 15767, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_7_MINUTE", DataType.U16, RegisterType.ReadOnly, 15768, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_7_SECOND", DataType.U16, RegisterType.ReadOnly, 15769, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_7_CODE", DataType.U16, RegisterType.ReadOnly, 15770, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_8_ID", DataType.U16, RegisterType.ReadOnly, 15771, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_8_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15772, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_8_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15773, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_8_YEAR", DataType.U16, RegisterType.ReadOnly, 15774, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_8_MONTH", DataType.U16, RegisterType.ReadOnly, 15775, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_8_DAY", DataType.U16, RegisterType.ReadOnly, 15776, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_8_HOUR", DataType.U16, RegisterType.ReadOnly, 15777, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_8_MINUTE", DataType.U16, RegisterType.ReadOnly, 15778, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_8_SECOND", DataType.U16, RegisterType.ReadOnly, 15779, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_8_CODE", DataType.U16, RegisterType.ReadOnly, 15780, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_9_ID", DataType.U16, RegisterType.ReadOnly, 15781, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_9_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15782, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_9_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15783, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_9_YEAR", DataType.U16, RegisterType.ReadOnly, 15784, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_9_MONTH", DataType.U16, RegisterType.ReadOnly, 15785, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_9_DAY", DataType.U16, RegisterType.ReadOnly, 15786, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_9_HOUR", DataType.U16, RegisterType.ReadOnly, 15787, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_9_MINUTE", DataType.U16, RegisterType.ReadOnly, 15788, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_9_SECOND", DataType.U16, RegisterType.ReadOnly, 15789, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_9_CODE", DataType.U16, RegisterType.ReadOnly, 15790, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_10_ID", DataType.U16, RegisterType.ReadOnly, 15791, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_10_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15792, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_10_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15793, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_10_YEAR", DataType.U16, RegisterType.ReadOnly, 15794, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_10_MONTH", DataType.U16, RegisterType.ReadOnly, 15795, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_10_DAY", DataType.U16, RegisterType.ReadOnly, 15796, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_10_HOUR", DataType.U16, RegisterType.ReadOnly, 15797, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_10_MINUTE", DataType.U16, RegisterType.ReadOnly, 15798, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_10_SECOND", DataType.U16, RegisterType.ReadOnly, 15799, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_10_CODE", DataType.U16, RegisterType.ReadOnly, 15800, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_11_ID", DataType.U16, RegisterType.ReadOnly, 15801, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_11_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15802, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_11_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15803, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_11_YEAR", DataType.U16, RegisterType.ReadOnly, 15804, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_11_MONTH", DataType.U16, RegisterType.ReadOnly, 15805, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_11_DAY", DataType.U16, RegisterType.ReadOnly, 15806, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_11_HOUR", DataType.U16, RegisterType.ReadOnly, 15807, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_11_MINUTE", DataType.U16, RegisterType.ReadOnly, 15808, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_11_SECOND", DataType.U16, RegisterType.ReadOnly, 15809, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_11_CODE", DataType.U16, RegisterType.ReadOnly, 15810, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_12_ID", DataType.U16, RegisterType.ReadOnly, 15811, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_12_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15812, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_12_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15813, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_12_YEAR", DataType.U16, RegisterType.ReadOnly, 15814, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_12_MONTH", DataType.U16, RegisterType.ReadOnly, 15815, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_12_DAY", DataType.U16, RegisterType.ReadOnly, 15816, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_12_HOUR", DataType.U16, RegisterType.ReadOnly, 15817, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_12_MINUTE", DataType.U16, RegisterType.ReadOnly, 15818, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_12_SECOND", DataType.U16, RegisterType.ReadOnly, 15819, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_12_CODE", DataType.U16, RegisterType.ReadOnly, 15820, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_13_ID", DataType.U16, RegisterType.ReadOnly, 15821, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_13_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15822, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_13_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15823, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_13_YEAR", DataType.U16, RegisterType.ReadOnly, 15824, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_13_MONTH", DataType.U16, RegisterType.ReadOnly, 15825, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_13_DAY", DataType.U16, RegisterType.ReadOnly, 15826, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_13_HOUR", DataType.U16, RegisterType.ReadOnly, 15827, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_13_MINUTE", DataType.U16, RegisterType.ReadOnly, 15828, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_13_SECOND", DataType.U16, RegisterType.ReadOnly, 15829, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_13_CODE", DataType.U16, RegisterType.ReadOnly, 15830, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_14_ID", DataType.U16, RegisterType.ReadOnly, 15831, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_14_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15832, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_14_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15833, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_14_YEAR", DataType.U16, RegisterType.ReadOnly, 15834, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_14_MONTH", DataType.U16, RegisterType.ReadOnly, 15835, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_14_DAY", DataType.U16, RegisterType.ReadOnly, 15836, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_14_HOUR", DataType.U16, RegisterType.ReadOnly, 15837, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_14_MINUTE", DataType.U16, RegisterType.ReadOnly, 15838, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_14_SECOND", DataType.U16, RegisterType.ReadOnly, 15839, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_14_CODE", DataType.U16, RegisterType.ReadOnly, 15840, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_15_ID", DataType.U16, RegisterType.ReadOnly, 15841, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_15_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15842, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_15_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15843, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_15_YEAR", DataType.U16, RegisterType.ReadOnly, 15844, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_15_MONTH", DataType.U16, RegisterType.ReadOnly, 15845, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_15_DAY", DataType.U16, RegisterType.ReadOnly, 15846, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_15_HOUR", DataType.U16, RegisterType.ReadOnly, 15847, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_15_MINUTE", DataType.U16, RegisterType.ReadOnly, 15848, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_15_SECOND", DataType.U16, RegisterType.ReadOnly, 15849, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_15_CODE", DataType.U16, RegisterType.ReadOnly, 15850, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_16_ID", DataType.U16, RegisterType.ReadOnly, 15851, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_16_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15852, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_16_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15853, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_16_YEAR", DataType.U16, RegisterType.ReadOnly, 15854, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_16_MONTH", DataType.U16, RegisterType.ReadOnly, 15855, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_16_DAY", DataType.U16, RegisterType.ReadOnly, 15856, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_16_HOUR", DataType.U16, RegisterType.ReadOnly, 15857, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_16_MINUTE", DataType.U16, RegisterType.ReadOnly, 15858, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_16_SECOND", DataType.U16, RegisterType.ReadOnly, 15859, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_16_CODE", DataType.U16, RegisterType.ReadOnly, 15860, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_17_ID", DataType.U16, RegisterType.ReadOnly, 15861, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_17_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15862, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_17_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15863, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_17_YEAR", DataType.U16, RegisterType.ReadOnly, 15864, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_17_MONTH", DataType.U16, RegisterType.ReadOnly, 15865, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_17_DAY", DataType.U16, RegisterType.ReadOnly, 15866, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_17_HOUR", DataType.U16, RegisterType.ReadOnly, 15867, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_17_MINUTE", DataType.U16, RegisterType.ReadOnly, 15868, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_17_SECOND", DataType.U16, RegisterType.ReadOnly, 15869, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_17_CODE", DataType.U16, RegisterType.ReadOnly, 15870, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_18_ID", DataType.U16, RegisterType.ReadOnly, 15871, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_18_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15872, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_18_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15873, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_18_YEAR", DataType.U16, RegisterType.ReadOnly, 15874, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_18_MONTH", DataType.U16, RegisterType.ReadOnly, 15875, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_18_DAY", DataType.U16, RegisterType.ReadOnly, 15876, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_18_HOUR", DataType.U16, RegisterType.ReadOnly, 15877, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_18_MINUTE", DataType.U16, RegisterType.ReadOnly, 15878, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_18_SECOND", DataType.U16, RegisterType.ReadOnly, 15879, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_18_CODE", DataType.U16, RegisterType.ReadOnly, 15880, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_19_ID", DataType.U16, RegisterType.ReadOnly, 15881, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_19_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15882, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_19_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15883, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_19_YEAR", DataType.U16, RegisterType.ReadOnly, 15884, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_19_MONTH", DataType.U16, RegisterType.ReadOnly, 15885, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_19_DAY", DataType.U16, RegisterType.ReadOnly, 15886, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_19_HOUR", DataType.U16, RegisterType.ReadOnly, 15887, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_19_MINUTE", DataType.U16, RegisterType.ReadOnly, 15888, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_19_SECOND", DataType.U16, RegisterType.ReadOnly, 15889, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_19_CODE", DataType.U16, RegisterType.ReadOnly, 15890, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_20_ID", DataType.U16, RegisterType.ReadOnly, 15891, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_20_STATE_NOW", DataType.U16, RegisterType.ReadOnly, 15892, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_20_STATE_PREVIOUS", DataType.U16, RegisterType.ReadOnly, 15893, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_20_YEAR", DataType.U16, RegisterType.ReadOnly, 15894, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_20_MONTH", DataType.U16, RegisterType.ReadOnly, 15895, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_20_DAY", DataType.U16, RegisterType.ReadOnly, 15896, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_20_HOUR", DataType.U16, RegisterType.ReadOnly, 15897, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_20_MINUTE", DataType.U16, RegisterType.ReadOnly, 15898, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_20_SECOND", DataType.U16, RegisterType.ReadOnly, 15899, undefined, undefined, "Alarm log information"),
- r("ALARM_LOG_20_CODE", DataType.U16, RegisterType.ReadOnly, 15900, undefined, undefined, "Alarm log information"),
- r("ALARM_TYPE_A", DataType.U16, RegisterType.ReadOnly, 15901, 0, 1, "Indicates if an alarm Type A is active"),
- r("ALARM_TYPE_B", DataType.U16, RegisterType.ReadOnly, 15902, 0, 1, "Indicates if an alarm Type B is active"),
- r("ALARM_TYPE_C", DataType.U16, RegisterType.ReadOnly, 15903, 0, 1, "Indicates if an alarm Type C is active"),
- r("PASSWD_ADMIN", DataType.U16, RegisterType.ReadWrite, 16001, undefined, undefined, "Administrator password.Bit 12-15: digit 1\nBit 8-11: digit 2\nBit 4-7: digit 3\nBit 0-3: digit 4"),
- r("LOCKED_USER", DataType.U16, RegisterType.ReadWrite, 16002, 0, 1, "Indicates if the User level is locked.\n0: User menu locked\n1: User menu not locked"),
- r("LOCKED_FILTER", DataType.U16, RegisterType.ReadWrite, 16003, 0, 1, "Indicates if the Filter menu is locked.\n0: menu locked\n1: menu not locked"),
- r("LOCKED_WEEK_SCHEDULE", DataType.U16, RegisterType.ReadWrite, 16004, 0, 1, "Indicates if the Week schedule menu islocked.\n0: menu locked\n1: menu not locked"),
- r("PASSWD_USER_LEVEL_REQUIRED", DataType.U16, RegisterType.ReadWrite, 16051, 0, 1, "Home screen lock"),
- r("PASSWD_FILTER_REQUIRED", DataType.U16, RegisterType.ReadWrite, 16052, 0, 1, "Filter Change menu lock"),
- r("PASSWD_WEEK_SCHEDULE_REQUIRED", DataType.U16, RegisterType.ReadWrite, 16053, 0, 1, "Week schedule menu lock"),
- r("PASSWD_PC_SETTINGS", DataType.U16, RegisterType.ReadWrite, 16061, undefined, undefined, ""),
- r("PASSWD_PC_UNLOCKED", DataType.U16, RegisterType.ReadOnly, 16062, 0, 1, ""),
- r("SUW_REQUIRED", DataType.U16, RegisterType.ReadWrite, 16101, 0, 1, "Indicates if the start-up wizard shall beactivated."),
- r("COMM_MODBUS_ADDRESS", DataType.U16, RegisterType.ReadWrite, 17001, 0, 255, "Modbus address of the MB.Only relevant if the MB is a modbus slave."),
- r("COMM_MODBUS_BAUD_RATE", DataType.U16, RegisterType.ReadWrite, 17002, 0, 10, "Baudrate of the modbus connection\n0=1200\n1=2400\n2=4800\n3=9600\n4=14400\n5=19200\n6=28800\n7=38400\n8=57600\n9=76800\n10=115200"),
- r("COMM_MODBUS_PARITY", DataType.U16, RegisterType.ReadWrite, 17003, 0, 2, "Parity setting for the modbus connection.\n0: None\n1: Even\n2: Odd"),
- r("FACTORY_RESET", DataType.U16, RegisterType.ReadWrite, 30101, 3228, 3228, "Activates setting of the parameters to their default values. Only activated by writing 3228 to this register."),
- r("SET_USER_SAFE_CONFIG", DataType.U16, RegisterType.ReadWrite, 30103, 0, 1, ""),
- r("ACTIVATE_USER_SAFE_CONFIG", DataType.U16, RegisterType.ReadWrite, 30104, 0, 1, ""),
- r("USER_SAFE_CONFIG_VALID", DataType.U16, RegisterType.ReadOnly, 30105, undefined, undefined, ""),
- r("SAFE_CONFIG_VALID", DataType.U16, RegisterType.ReadOnly, 30106, undefined, undefined, ""),
+    r(1001, U16, RO, "DEMC_RH_HIGHEST", 0, 100),
+    r(1002, U16, RO, "DEMC_CO2_HIGHEST", 0, 2000),
+    r(1011, U16, RO, "DEMC_RH_PI_SP", 0, 100),
+    r(1012, U16, RO, "DEMC_RH_PI_FEEDBACK", 0, 100),
+    r(1019, U16, RO, "DEMC_RH_PI_OUTPUT", UD, UD),
+    r(1021, U16, RO, "DEMC_CO2_PI_SP", 0, 2000),
+    r(1022, U16, RO, "DEMC_CO2_PI_FEEDBACK", 0, 2000),
+    r(1029, U16, RO, "DEMC_CO2_PI_OUTPUT", UD, UD),
+    r(1031, U16, RW, "DEMC_RH_SETTINGS_PBAND", 1, 100),
+    r(1033, U16, RW, "DEMC_RH_SETTINGS_SP_SUMMER", 10, 100),
+    r(1034, U16, RW, "DEMC_RH_SETTINGS_SP_WINTER", 10, 100),
+    r(1035, U16, RW, "DEMC_RH_SETTINGS_ON_OFF", 0, 1),
+    r(1039, U16, RO, "SUMMER_WINTER", 0, 1),
+    r(1041, U16, RW, "DEMC_CO2_SETTINGS_PBAND", 50, 2000),
+    r(1043, U16, RW, "DEMC_CO2_SETTINGS_SP", 100, 2000),
+    r(1044, U16, RW, "DEMC_CO2_SETTINGS_ON_OFF", 0, 1),
+    r(1101, U16, RW, "USERMODE_HOLIDAY_TIME", 1, 365),
+    r(1102, U16, RW, "USERMODE_AWAY_TIME", 1, 72),
+    r(1103, U16, RW, "USERMODE_FIREPLACE_TIME", 1, 60),
+    r(1104, U16, RW, "USERMODE_REFRESH_TIME", 1, 240),
+    r(1105, U16, RW, "USERMODE_CROWDED_TIME", 1, 8),
+    r(1111, U16, RO, "USERMODE_REMAINING_TIME_L", UD, UD),
+    r(1112, U16, RO, "USERMODE_REMAINING_TIME_H", UD, UD),
+    r(1121, U16, RW, "IAQ_SPEED_LEVEL_MIN", 2, 3),
+    r(1122, U16, RW, "IAQ_SPEED_LEVEL_MAX", 3, 5),
+    r(1123, U16, RO, "IAQ_LEVEL", 0, 2),
+    r(1131, U16, RW, "USERMODE_MANUAL_AIRFLOW_LEVEL_SAF", 0, 4),
+    r(1135, U16, RW, "USERMODE_CROWDED_AIRFLOW_LEVEL_SAF", 3, 5),
+    r(1136, U16, RW, "USERMODE_CROWDED_AIRFLOW_LEVEL_EAF", 3, 5),
+    r(1137, U16, RW, "USERMODE_REFRESH_AIRFLOW_LEVEL_SAF", 3, 5),
+    r(1138, U16, RW, "USERMODE_REFRESH_AIRFLOW_LEVEL_EAF", 3, 5),
+    r(1139, U16, RW, "USERMODE_FIREPLACE_AIRFLOW_LEVEL_SAF", 3, 5),
+    r(1140, U16, RW, "USERMODE_FIREPLACE_AIRFLOW_LEVEL_EAF", 1, 3),
+    r(1141, U16, RW, "USERMODE_AWAY_AIRFLOW_LEVEL_SAF", 0, 3),
+    r(1142, U16, RW, "USERMODE_AWAY_AIRFLOW_LEVEL_EAF", 0, 3),
+    r(1143, U16, RW, "USERMODE_HOLIDAY_AIRFLOW_LEVEL_SAF", 0, 3),
+    r(1144, U16, RW, "USERMODE_HOLIDAY_AIRFLOW_LEVEL_EAF", 0, 3),
+    r(1145, U16, RW, "USERMODE_COOKERHOOD_AIRFLOW_LEVEL_SAF", 1, 5),
+    r(1146, U16, RW, "USERMODE_COOKERHOOD_AIRFLOW_LEVEL_EAF", 1, 5),
+    r(1147, U16, RW, "USERMODE_VACUUMCLEANER_AIRFLOW_LEVEL_SAF", 1, 5),
+    r(1148, U16, RW, "USERMODE_VACUUMCLEANER_AIRFLOW_LEVEL_EAF", 1, 5),
+    r(1151, I16, RW, "USERMODE_CROWDED_T_OFFSET", -100, 0),
+    r(1161, U16, RO, "USERMODE_MODE", 0, 12),
+    r(1162, U16, RW, "USERMODE_HMI_CHANGE_REQUEST", 0, 7),
+    r(1171, U16, RW, "CDI_1_AIRFLOW_LEVEL_SAF", 0, 5),
+    r(1172, U16, RW, "CDI_1_AIRFLOW_LEVEL_EAF", 0, 5),
+    r(1173, U16, RW, "CDI_2_AIRFLOW_LEVEL_SAF", 0, 5),
+    r(1174, U16, RW, "CDI_2_AIRFLOW_LEVEL_EAF", 0, 5),
+    r(1175, U16, RW, "CDI_3_AIRFLOW_LEVEL_SAF", 0, 5),
+    r(1176, U16, RW, "CDI_3_AIRFLOW_LEVEL_EAF", 0, 5),
+    r(1177, U16, RW, "PRESSURE_GUARD_AIRFLOW_LEVEL_SAF", 0, 5),
+    r(1178, U16, RW, "PRESSURE_GUARD_AIRFLOW_LEVEL_EAF", 0, 5),
+    r(1181, U16, RW, "USERMODE_HOLIDAY_DI_OFF_DELAY", 0, 365),
+    r(1182, U16, RW, "USERMODE_AWAY_DI_OFF_DELAY", 0, 72),
+    r(1183, U16, RW, "USERMODE_FIRPLACE_DI_OFF_DELAY", 0, 60),
+    r(1184, U16, RW, "USERMODE_REFRESH_DI_OFF_DELAY", 0, 240),
+    r(1185, U16, RW, "USERMODE_CROWDED_DI_OFF_DELAY", 0, 8),
+    r(1188, U16, RW, "CDI1_OFF_DELAY", 0, 240),
+    r(1189, U16, RW, "CDI2_OFF_DELAY", 0, 240),
+    r(1190, U16, RW, "CDI3_OFF_DELAY", 0, 240),
+    r(1221, U16, RO, "SPEED_CDI1_SAF", UD, UD),
+    r(1222, U16, RO, "SPEED_CDI1_EAF", UD, UD),
+    r(1223, U16, RO, "SPEED_CDI2_SAF", UD, UD),
+    r(1224, U16, RO, "SPEED_CDI2_EAF", UD, UD),
+    r(1225, U16, RO, "SPEED_CDI3_SAF", UD, UD),
+    r(1226, U16, RO, "SPEED_CDI3_EAF", UD, UD),
+    r(1227, U16, RO, "SPEED_PRESSURE_GUARD_SAF", UD, UD),
+    r(1228, U16, RO, "SPEED_PRESSURE_GUARD_EAF", UD, UD),
+    r(1251, U16, RW, "FAN_OUTDOOR_COMP_TYPE", 0, 1),
+    r(1252, U16, RW, "FAN_OUTDOOR_COMP_MAX_VALUE", 0, 50),
+    r(1253, I16, RW, "FAN_OUTDOOR_COMP_STOP_T_WINTER", -300, 0),
+    r(1254, I16, RW, "FAN_OUTDOOR_COMP_MAX_TEMP", -300, 0),
+    r(1256, U16, RW, "FAN_OUTDOOR_COMP_START_T_WINTER", -300, 0),
+    r(1257, U16, RW, "FAN_OUTDOOR_COMP_START_T_SUMMER", 150, 300),
+    r(1258, U16, RW, "FAN_OUTDOOR_COMP_STOP_T_SUMMER", 150, 400),
+    r(1259, U16, RW, "FAN_OUTDOOR_COMP_VALUE_SUMMER", 0, 50),
+    r(1274, U16, RW, "FAN_REGULATION_UNIT", 0, 4),
+    r(1301, U16, RO, "FAN_LEVEL_SAF_MIN", UD, UD),
+    r(1302, U16, RO, "FAN_LEVEL_EAF_MIN", UD, UD),
+    r(1303, U16, RO, "FAN_LEVEL_SAF_LOW", UD, UD),
+    r(1304, U16, RO, "FAN_LEVEL_EAF_LOW", UD, UD),
+    r(1305, U16, RO, "FAN_LEVEL_SAF_NORMAL", UD, UD),
+    r(1306, U16, RO, "FAN_LEVEL_EAF_NORMAL", UD, UD),
+    r(1307, U16, RO, "FAN_LEVEL_SAF_HIGH", UD, UD),
+    r(1308, U16, RO, "FAN_LEVEL_EAF_HIGH", UD, UD),
+    r(1309, U16, RO, "FAN_LEVEL_SAF_MAX", UD, UD),
+    r(1310, U16, RO, "FAN_LEVEL_EAF_MAX", UD, UD),
+    r(1351, U16, RO, "SPEED_FANS_RUNNING", 0, 1),
+    r(1352, U16, RO, "SPEED_SAF_DESIRED_OFF", 0, 1),
+    r(1353, U16, RW, "FAN_MANUAL_STOP_ALLOWED", 0, 1),
+    r(1357, U16, RO, "SPEED_ELECTRICAL_HEATER_HOT_COUNTER", UD, UD),
+    r(1358, U16, RO, "FAN_SPEED_AFTER_HEATER_COOLING_DOWN_SAF", 0, 100),
+    r(1359, U16, RO, "FAN_SPEED_AFTER_HEATER_COOLING_DOWN_EAF", 0, 100),
+    r(1401, U16, RW, "FAN_LEVEL_SAF_MIN_PERCENTAGE", 16, 100),
+    r(1402, U16, RW, "FAN_LEVEL_EAF_MIN_PERCENTAGE", 16, 100),
+    r(1403, U16, RW, "FAN_LEVEL_SAF_LOW_PERCENTAGE", 16, 100),
+    r(1404, U16, RW, "FAN_LEVEL_EAF_LOW_PERCENTAGE", 16, 100),
+    r(1405, U16, RW, "FAN_LEVEL_SAF_NORMAL_PERCENTAGE", 16, 100),
+    r(1406, U16, RW, "FAN_LEVEL_EAF_NORMAL_PERCENTAGE", 16, 100),
+    r(1407, U16, RW, "FAN_LEVEL_SAF_HIGH_PERCENTAGE", 16, 100),
+    r(1408, U16, RW, "FAN_LEVEL_EAF_HIGH_PERCENTAGE", 16, 100),
+    r(1409, U16, RW, "FAN_LEVEL_SAF_MAX_PERCENTAGE", 16, 100),
+    r(1410, U16, RW, "FAN_LEVEL_EAF_MAX_PERCENTAGE", 16, 100),
+    r(1411, U16, RW, "FAN_LEVEL_SAF_MIN_RPM", 500, 5000),
+    r(1412, U16, RW, "FAN_LEVEL_EAF_MIN_RPM", 500, 5000),
+    r(1413, U16, RW, "FAN_LEVEL_SAF_LOW_RPM", 500, 5000),
+    r(1414, U16, RW, "FAN_LEVEL_EAF_LOW_RPM", 500, 5000),
+    r(1415, U16, RW, "FAN_LEVEL_SAF_NORMAL_RPM", 500, 5000),
+    r(1416, U16, RW, "FAN_LEVEL_EAF_NORMAL_RPM", 500, 5000),
+    r(1417, U16, RW, "FAN_LEVEL_SAF_HIGH_RPM", 500, 5000),
+    r(1418, U16, RW, "FAN_LEVEL_EAF_HIGH_RPM", 500, 5000),
+    r(1419, U16, RW, "FAN_LEVEL_SAF_MAX_RPM", 500, 5000),
+    r(1420, U16, RW, "FAN_LEVEL_EAF_MAX_RPM", 500, 5000),
+    r(1421, U16, RW, "FAN_LEVEL_SAF_MIN_PRESSURE", UD, UD),
+    r(1422, U16, RW, "FAN_LEVEL_EAF_MIN_PRESSURE", UD, UD),
+    r(1423, U16, RW, "FAN_LEVEL_SAF_LOW_PRESSURE", UD, UD),
+    r(1424, U16, RW, "FAN_LEVEL_EAF_LOW_PRESSURE", UD, UD),
+    r(1425, U16, RW, "FAN_LEVEL_SAF_NORMAL_PRESSURE", UD, UD),
+    r(1426, U16, RW, "FAN_LEVEL_EAF_NORMAL_PRESSURE", UD, UD),
+    r(1427, U16, RW, "FAN_LEVEL_SAF_HIGH_PRESSURE", UD, UD),
+    r(1428, U16, RW, "FAN_LEVEL_EAF_HIGH_PRESSURE", UD, UD),
+    r(1429, U16, RW, "FAN_LEVEL_SAF_MAX_PRESSURE", UD, UD),
+    r(1430, U16, RW, "FAN_LEVEL_EAF_MAX_PRESSURE", UD, UD),
+    r(1431, U16, RW, "FAN_LEVEL_SAF_MIN_FLOW", UD, UD),
+    r(1432, U16, RW, "FAN_LEVEL_EAF_MIN_FLOW", UD, UD),
+    r(1433, U16, RW, "FAN_LEVEL_SAF_LOW_FLOW", UD, UD),
+    r(1434, U16, RW, "FAN_LEVEL_EAF_LOW_FLOW", UD, UD),
+    r(1435, U16, RW, "FAN_LEVEL_SAF_NORMAL_FLOW", UD, UD),
+    r(1436, U16, RW, "FAN_LEVEL_EAF_NORMAL_FLOW", UD, UD),
+    r(1437, U16, RW, "FAN_LEVEL_SAF_HIGH_FLOW", UD, UD),
+    r(1438, U16, RW, "FAN_LEVEL_EAF_HIGH_FLOW", UD, UD),
+    r(1439, U16, RW, "FAN_LEVEL_SAF_MAX_FLOW", UD, UD),
+    r(1440, U16, RW, "FAN_LEVEL_EAF_MAX_FLOW", UD, UD),
+    r(1621, U16, RO, "USERMODE_REMAINING_TIME_CDI1_L", UD, UD),
+    r(1622, U16, RO, "USERMODE_REMAINING_TIME_CDI1_H", UD, UD),
+    r(1623, U16, RO, "USERMODE_REMAINING_TIME_CDI2_L", UD, UD),
+    r(1624, U16, RO, "USERMODE_REMAINING_TIME_CDI2_H", UD, UD),
+    r(1625, U16, RO, "USERMODE_REMAINING_TIME_CDI3_L", UD, UD),
+    r(1626, U16, RO, "USERMODE_REMAINING_TIME_CDI3_H", UD, UD),
+    r(2001, I16, RW, "TC_SP", 120, 300),
+    r(2013, I16, RW, "TC_CASCADE_SP", 120, 400),
+    r(2021, I16, RW, "TC_CASCADE_SP_MIN", 120, 400),
+    r(2022, I16, RW, "TC_CASCADE_SP_MAX", 120, 400),
+    r(2031, U16, RW, "TC_CONTROL_MODE", 0, 2),
+    r(2051, I16, RO, "TC_EAT_RAT_SP", 120, 400),
+    r(2053, I16, RO, "TC_ROOM_CTRL_SP_SATC", 120, 400),
+    r(2054, I16, RO, "TC_SP_SATC", 120, 300),
+    r(2055, U16, RO, "SATC_HEAT_DEMAND", 0, 100),
+    r(2061, I16, RO, "SATC_PI_SP", 120, 300),
+    r(2069, I16, RO, "SATC_PI_OUTPUT", 0, 100),
+    r(2071, I16, RO, "ROOM_CTRL_PI_SP", 120, 300),
+    r(2079, I16, RO, "ROOM_CTRL_PI_OUTPUT", 0, 100),
+    r(2101, U16, RO, "INPUT_EXTERNAL_CTRL_SAF", 0, 100),
+    r(2102, U16, RO, "INPUT_EXTERNAL_CTRL_EAF", 0, 100),
+    r(2113, I16, RW, "HEATER_CIRC_PUMP_START_T", 0, 200),
+    r(2122, U16, RW, "HEATER_CIRC_PUMP_STOP_DELAY", 0, 60),
+    r(2134, U16, RW, "HEAT_EXCHANGER_COOLING_RECOVERY_ON_OFF", 0, 1),
+    r(2147, U16, RO, "HEAT_EXCHANGER_RH_TRANSFER_CTRL_ENABLED", UD, UD),
+    r(2149, U16, RO, "PWM_TRIAC_OUTPUT", 0, 100),
+    r(2201, U16, RW, "ROTOR_RH_TRANSFER_CTRL_PBAND", 0, 40),
+    r(2202, U16, RW, "ROTOR_RH_TRANSFER_CTRL_ITIME", 120, 0),
+    r(2203, U16, RW, "ROTOR_RH_TRANSFER_CTRL_SETPOINT", 100, 45),
+    r(2204, U16, RW, "ROTOR_RH_TRANSFER_CTRL_ON_OFF", 1, 1),
+    r(2211, U16, RO, "ROTOR_EA_SPEC_HUMIDITY", UD, UD),
+    r(2212, U16, RO, "ROTOR_OA_SPEC_HUMIDITY", UD, UD),
+    r(2213, U16, RO, "ROTOR_EA_SPEC_HUMIDITY_SETPOINT", UD, UD),
+    r(2311, U16, RO, "COOLER_FROM_SATC", 0, 100),
+    r(2314, U16, RW, "COOLER_CIRC_PUMP_START_T", 0, 200),
+    r(2315, U16, RW, "COOLER_RECOVERY_LIMIT_T", 0, 100),
+    r(2316, U16, RW, "COOLER_OAT_INTERLOCK_T", 120, 250),
+    r(2317, U16, RW, "COOLER_CIRC_PUMP_STOP_DELAY", 0, 60),
+    r(2403, I16, RW, "EXTRA_CONTROLLER_SET_PI_SETPOINT", -300, 400),
+    r(2404, I16, RW, "EXTRA_CONTROLLER_CIRC_PUMP_START_T", 0, 200),
+    r(2405, U16, RW, "EXTRA_CONTROLLER_CIRC_PUMP_STOP_DELAY", 0, 60),
+    r(2418, U16, RW, "EXTRA_CONTROLLER_PREHEATER_SETPOINT_TYPE", 0, 1),
+    r(2420, I16, RW, "EXTRA_CONTROLLER_GEO_PREHEATER_SP", -300, 100),
+    r(2421, I16, RW, "EXTRA_CONTROLLER_GEO_PREHEATER_ACTIVATION_T", -300, 0),
+    r(2422, I16, RW, "EXTRA_CONTROLLER_GEO_PRECOOLER_SP", 100, 300),
+    r(2423, I16, RW, "EXTRA_CONTROLLER_GEO_PRECOOLER_ACTIVATION_T", 150, 300),
+    r(2451, I16, RW, "CHANGE_OVER_CIRC_PUMP_START_T", 0, 200),
+    r(2452, U16, RW, "CHANGE_OVER_CIRC_PUMP_STOP_DELAY", 0, 60),
+    r(2504, I16, RW, "ECO_T_Y1_OFFSET", 0, 100),
+    r(2505, U16, RW, "ECO_MODE_ON_OFF", 0, 1),
+    r(2506, U16, RO, "ECO_FUNCTION_ACTIVE", 0, 1),
+    r(3101, U16, RO, "FUNCTION_ACTIVE_COOLING", UD, UD),
+    r(3102, U16, RO, "FUNCTION_ACTIVE_FREE_COOLING", UD, UD),
+    r(3103, U16, RO, "FUNCTION_ACTIVE_HEATING", UD, UD),
+    r(3104, U16, RO, "FUNCTION_ACTIVE_DEFROSTING", UD, UD),
+    r(3105, U16, RO, "FUNCTION_ACTIVE_HEAT_RECOVERY", UD, UD),
+    r(3106, U16, RO, "FUNCTION_ACTIVE_COOLING_RECOVERY", UD, UD),
+    r(3107, U16, RO, "FUNCTION_ACTIVE_MOISTURE_TRANSFER", UD, UD),
+    r(3108, U16, RO, "FUNCTION_ACTIVE_SECONDARY_AIR", UD, UD),
+    r(3109, U16, RO, "FUNCTION_ACTIVE_VACUUM_CLEANER", UD, UD),
+    r(3110, U16, RO, "FUNCTION_ACTIVE_COOKER_HOOD", UD, UD),
+    r(3111, U16, RO, "FUNCTION_ACTIVE_USER_LOCK", UD, UD),
+    r(3112, U16, RO, "FUNCTION_ACTIVE_ECO_MODE", UD, UD),
+    r(3113, U16, RO, "FUNCTION_ACTIVE_HEATER_COOL_DOWN", 0, 1),
+    r(3114, U16, RO, "FUNCTION_ACTIVE_PRESSURE_GUARD", 0, 1),
+    r(3115, U16, RO, "FUNCTION_ACTIVE_CDI_1", 0, 1),
+    r(3116, U16, RO, "FUNCTION_ACTIVE_CDI_2", 0, 1),
+    r(3117, U16, RO, "FUNCTION_ACTIVE_CDI_3", 0, 1),
+    r(4101, U16, RW, "FREE_COOLING_ON_OFF", 0, 1),
+    r(4102, I16, RW, "FREE_COOLING_OUTDOOR_DAYTIME_T", 120, 300),
+    r(4103, I16, RW, "FREE_COOLING_OUTDOOR_NIGHTTIME_DEACTIVATION_HIGH_T_LIMIT", 70, 300),
+    r(4104, I16, RW, "FREE_COOLING_OUTDOOR_NIGHTTIME_DEACTIVATION_LOW_T_LIMIT", 70, 300),
+    r(4105, I16, RW, "FREE_COOLING_ROOM_CANCEL_T", 120, 300),
+    r(4106, U16, RW, "FREE_COOLING_START_TIME_H", UD, UD),
+    r(4107, U16, RW, "FREE_COOLING_START_TIME_M", 0, 59),
+    r(4108, U16, RW, "FREE_COOLING_END_TIME_H", UD, UD),
+    r(4109, U16, RW, "FREE_COOLING_END_TIME_M", 0, 59),
+    r(4111, U16, RO, "FREE_COOLING_ACTIVE", 0, 1),
+    r(4112, U16, RW, "FREE_COOLING_MIN_SPEED_LEVEL_SAF", 3, 5),
+    r(4113, U16, RW, "FREE_COOLING_MIN_SPEED_LEVEL_EAF", 3, 5),
+    r(5001, I16, RW, "WS_T_OFFSET_ACTIVE", -100, 0),
+    r(5002, I16, RW, "WS_T_OFFSET_INACTIVE", -100, 0),
+    r(5003, U16, RW, "WS_DAY1_PRD1_START_H", 0, 23),
+    r(5004, U16, RW, "WS_DAY1_PRD1_START_M", 0, 59),
+    r(5005, U16, RW, "WS_DAY1_PRD1_END_H", 0, 23),
+    r(5006, U16, RW, "WS_DAY1_PRD1_END_M", 0, 59),
+    r(5007, U16, RW, "WS_DAY1_PRD2_START_H", 0, 23),
+    r(5008, U16, RW, "WS_DAY1_PRD2_START_M", 0, 59),
+    r(5009, U16, RW, "WS_DAY1_PRD2_END_H", 0, 23),
+    r(5010, U16, RW, "WS_DAY1_PRD2_END_M", 0, 59),
+    r(5011, U16, RW, "WS_DAY2_PRD1_START_H", 0, 23),
+    r(5012, U16, RW, "WS_DAY2_PRD1_START_M", 0, 59),
+    r(5013, U16, RW, "WS_DAY2_PRD1_END_H", 0, 23),
+    r(5014, U16, RW, "WS_DAY2_PRD1_END_M", 0, 59),
+    r(5015, U16, RW, "WS_DAY2_PRD2_START_H", 0, 23),
+    r(5016, U16, RW, "WS_DAY2_PRD2_START_M", 0, 59),
+    r(5017, U16, RW, "WS_DAY2_PRD2_END_H", 0, 23),
+    r(5018, U16, RW, "WS_DAY2_PRD2_END_M", 0, 59),
+    r(5019, U16, RW, "WS_DAY3_PRD1_START_H", 0, 23),
+    r(5020, U16, RW, "WS_DAY3_PRD1_START_M", 0, 59),
+    r(5021, U16, RW, "WS_DAY3_PRD1_END_H", 0, 23),
+    r(5022, U16, RW, "WS_DAY3_PRD1_END_M", 0, 59),
+    r(5022, U16, RW, "WS_DAY3_PRD1_END_M", 0, 59),
+    r(5023, U16, RW, "WS_DAY3_PRD2_START_H", 0, 23),
+    r(5024, U16, RW, "WS_DAY3_PRD2_START_M", 0, 59),
+    r(5025, U16, RW, "WS_DAY3_PRD2_END_H", 0, 23),
+    r(5026, U16, RW, "WS_DAY3_PRD2_END_M", 0, 59),
+    r(5027, U16, RW, "WS_DAY4_PRD1_START_H", 0, 23),
+    r(5028, U16, RW, "WS_DAY4_PRD1_START_M", 0, 59),
+    r(5029, U16, RW, "WS_DAY4_PRD1_END_H", 0, 23),
+    r(5030, U16, RW, "WS_DAY4_PRD1_END_M", 0, 59),
+    r(5031, U16, RW, "WS_DAY4_PRD2_START_H", 0, 23),
+    r(5032, U16, RW, "WS_DAY4_PRD2_START_M", 0, 59),
+    r(5033, U16, RW, "WS_DAY4_PRD2_END_H", 0, 23),
+    r(5034, U16, RW, "WS_DAY4_PRD2_END_M", 0, 59),
+    r(5035, U16, RW, "WS_DAY5_PRD1_START_H", 0, 23),
+    r(5036, U16, RW, "WS_DAY5_PRD1_START_M", 0, 59),
+    r(5037, U16, RW, "WS_DAY5_PRD1_END_H", 0, 23),
+    r(5038, U16, RW, "WS_DAY5_PRD1_END_M", 0, 59),
+    r(5039, U16, RW, "WS_DAY5_PRD2_START_H", 0, 23),
+    r(5040, U16, RW, "WS_DAY5_PRD2_START_M", 0, 59),
+    r(5041, U16, RW, "WS_DAY5_PRD2_END_H", 0, 23),
+    r(5042, U16, RW, "WS_DAY5_PRD2_END_M", 0, 59),
+    r(5043, U16, RW, "WS_DAY6_PRD1_START_H", 0, 23),
+    r(5044, U16, RW, "WS_DAY6_PRD1_START_M", 0, 59),
+    r(5045, U16, RW, "WS_DAY6_PRD1_END_H", 0, 23),
+    r(5046, U16, RW, "WS_DAY6_PRD1_END_M", 0, 59),
+    r(5047, U16, RW, "WS_DAY6_PRD2_START_H", 0, 23),
+    r(5048, U16, RW, "WS_DAY6_PRD2_START_M", 0, 59),
+    r(5049, U16, RW, "WS_DAY6_PRD2_END_H", 0, 23),
+    r(5050, U16, RW, "WS_DAY6_PRD2_END_M", 0, 59),
+    r(5051, U16, RW, "WS_DAY7_PRD1_START_H", 0, 23),
+    r(5052, U16, RW, "WS_DAY7_PRD1_START_M", 0, 59),
+    r(5053, U16, RW, "WS_DAY7_PRD1_END_H", 0, 23),
+    r(5054, U16, RW, "WS_DAY7_PRD1_END_M", 0, 59),
+    r(5055, U16, RW, "WS_DAY7_PRD2_START_H", 0, 23),
+    r(5056, U16, RW, "WS_DAY7_PRD2_START_M", 0, 59),
+    r(5057, U16, RW, "WS_DAY7_PRD2_END_H", 0, 23),
+    r(5058, U16, RW, "WS_DAY7_PRD2_END_M", 0, 59),
+    r(5059, U16, RO, "WS_ACTIVE", 0, 1),
+    r(5060, U16, RW, "WS_FAN_LEVEL_SCHEDULED", 1, 5),
+    r(5061, U16, RW, "WS_FAN_LEVEL_UNSCHEDULED", 1, 5),
+    r(5101, U16, RW, "WS_DAY1_PRD1_ENABLED", 0, 1),
+    r(5102, U16, RW, "WS_DAY1_PRD2_ENABLED", 0, 1),
+    r(5103, U16, RW, "WS_DAY2_PRD1_ENABLED", 0, 1),
+    r(5104, U16, RW, "WS_DAY2_PRD2_ENABLED", 0, 1),
+    r(5105, U16, RW, "WS_DAY3_PRD1_ENABLED", 0, 1),
+    r(5106, U16, RW, "WS_DAY3_PRD2_ENABLED", 0, 1),
+    r(5107, U16, RW, "WS_DAY4_PRD1_ENABLED", 0, 1),
+    r(5108, U16, RW, "WS_DAY4_PRD2_ENABLED", 0, 1),
+    r(5109, U16, RW, "WS_DAY5_PRD1_ENABLED", 0, 1),
+    r(5110, U16, RW, "WS_DAY5_PRD2_ENABLED", 0, 1),
+    r(5111, U16, RW, "WS_DAY6_PRD1_ENABLED", 0, 1),
+    r(5112, U16, RW, "WS_DAY6_PRD2_ENABLED", 0, 1),
+    r(5113, U16, RW, "WS_DAY7_PRD1_ENABLED", 0, 1),
+    r(5114, U16, RW, "WS_DAY7_PRD2_ENABLED", 0, 1),
+    r(6001, U16, RW, "TIME_YEAR", 0, 2999),
+    r(6002, U16, RW, "TIME_MONTH", 1, 12),
+    r(6003, U16, RW, "TIME_DAY", 1, 31),
+    r(6004, U16, RW, "TIME_HOUR", 0, 23),
+    r(6005, U16, RW, "TIME_MINUTE", 0, 59),
+    r(6006, U16, RW, "TIME_SECOND", 0, 59),
+    r(6007, U16, RW, "TIME_AUTO_SUM_WIN", 0, 1),
+    r(6008, U16, RW, "HOUR_FORMAT", 0, 1),
+    r(6009, U16, RO, "DAY_OF_THE_WEEK", 0, 6),
+    r(6010, U16, RO, "DST_PERIOD_ACTIVE", 0, 1),
+    r(6011, U16, RO, "TIME_RTC_SECONDS_L", UD, UD),
+    r(6012, U16, RO, "TIME_RTC_SECONDS_H", UD, UD),
+    r(6021, U16, RO, "SYSTEM_START_UP_TIME_L", UD, UD),
+    r(6022, U16, RO, "SYSTEM_START_UP_TIME_H", UD, UD),
+    r(6101, U16, RO, "TIME_RTC", UD, UD),
+    r(7001, U16, RW, "FILTER_PERIOD", 3, 15),
+    r(7002, U16, RW, "FILTER_REPLACEMENT_TIME_L", UD, UD),
+    r(7003, U16, RW, "FILTER_REPLACEMENT_TIME_H", UD, UD),
+    r(7004, U16, RO, "FILTER_PERIOD_SET", UD, UD),
+    r(7005, U16, RO, "FILTER_REMAINING_TIME_L", UD, UD),
+    r(7006, U16, RO, "FILTER_REMAINING_TIME_H", UD, UD),
+    r(7007, U16, RO, "FILTER_ALARM_WAS_DETECTED", UD, UD),
+    r(9001, U16, RW, "SYSTEM_UNIT_FLOW", 0, 2),
+    r(9002, U16, RW, "SYSTEM_UNIT_PRESSURE", 0, 1),
+    r(9003, U16, RW, "SYSTEM_UNIT_TEMPERATURE", 0, 1),
+    r(11401, U16, RW, "DI_CONNECTION_1", 0, 18),
+    r(11402, U16, RW, "DI_CONNECTION_2", 0, 18),
+    r(11421, U16, RW, "DI_CFG_POLARITY_1", 0, 1),
+    r(11422, U16, RW, "DI_CFG_POLARITY_2", 0, 1),
+    r(12011, U16, RW, "INPUT_ANALOG_UI_1", UD, UD),
+    r(12012, U16, RW, "INPUT_ANALOG_UI_2", UD, UD),
+    r(12013, U16, RW, "INPUT_ANALOG_UI_3", UD, UD),
+    r(12014, U16, RW, "INPUT_ANALOG_UI_4", UD, UD),
+    r(12015, U16, RW, "INPUT_ANALOG_UI_5", UD, UD),
+    r(12016, U16, RO, "INPUT_ANALOG_UI_6", UD, UD),
+    r(12021, U16, RW, "INPUT_DIGITAL_UI_1", 0, 1),
+    r(12022, U16, RW, "INPUT_DIGITAL_UI_2", 0, 1),
+    r(12023, U16, RW, "INPUT_DIGITAL_UI_3", 0, 1),
+    r(12024, U16, RW, "INPUT_DIGITAL_UI_4", 0, 1),
+    r(12025, U16, RW, "INPUT_DIGITAL_UI_5", 0, 1),
+    r(12026, U16, RO, "INPUT_DIGITAL_UI_6", UD, UD),
+    r(12031, U16, RO, "INPUT_DIGITAL_DI_1", 0, 1),
+    r(12032, U16, RO, "INPUT_DIGITAL_DI_2", 0, 1),
+    r(12101, I16, RW, "SENSOR_FPT", -400, 800),
+    r(12102, I16, RW, "SENSOR_OAT", -400, 800),
+    r(12103, I16, RW, "SENSOR_SAT", -400, 800),
+    r(12104, I16, RW, "SENSOR_RAT", -400, 800),
+    r(12105, I16, RW, "SENSOR_EAT", -400, 800),
+    r(12106, I16, RW, "SENSOR_ECT", -400, 800),
+    r(12107, I16, RW, "SENSOR_EFT", -400, 800),
+    r(12108, I16, RW, "SENSOR_OHT", -400, 800),
+    r(12109, U16, RW, "SENSOR_RHS", 0, 100),
+    r(12112, U16, RO, "SENSOR_RGS", 0, 1),
+    r(12115, U16, RW, "SENSOR_CO2S", 0, 2000),
+    r(12136, U16, RW, "SENSOR_RHS_PDM", 0, 100),
+    r(12151, U16, RW, "SENSOR_CO2S_1", 0, 2000),
+    r(12152, U16, RW, "SENSOR_CO2S_2", 0, 2000),
+    r(12153, U16, RW, "SENSOR_CO2S_3", 0, 2000),
+    r(12154, U16, RW, "SENSOR_CO2S_4", 0, 2000),
+    r(12155, U16, RW, "SENSOR_CO2S_5", 0, 2000),
+    r(12156, U16, RO, "SENSOR_CO2S_6", UD, UD),
+    r(12161, U16, RW, "SENSOR_RHS_1", 0, 100),
+    r(12162, U16, RW, "SENSOR_RHS_2", 0, 100),
+    r(12163, U16, RW, "SENSOR_RHS_3", 0, 100),
+    r(12164, U16, RW, "SENSOR_RHS_4", 0, 100),
+    r(12165, U16, RW, "SENSOR_RHS_5", 0, 100),
+    r(12166, U16, RO, "SENSOR_RHS_6", 0, 100),
+    r(12301, U16, RO, "SENSOR_DI_AWAY", 0, 1),
+    r(12302, U16, RO, "SENSOR_DI_HOLIDAY", 0, 1),
+    r(12303, U16, RO, "SENSOR_DI_FIREPLACE", 0, 1),
+    r(12304, U16, RO, "SENSOR_DI_REHRESH", 0, 1),
+    r(12305, U16, RO, "SENSOR_DI_CROWDED", 0, 1),
+    r(12306, U16, RO, "SENSOR_DI_COOKERHOOD", 0, 1),
+    r(12307, U16, RO, "SENSOR_DI_VACUUMCLEANER", 0, 1),
+    r(12308, U16, RO, "SENSOR_DI_EXTERNAL_STOP", 0, 1),
+    r(12309, U16, RO, "SENSOR_DI_LOAD_DETECTED", 0, 1),
+    r(12310, U16, RO, "SENSOR_DI_EXTRA_CONTROLLER_EMT", 0, 1),
+    r(12311, U16, RO, "SENSOR_DI_FIRE_ALARM", 0, 1),
+    r(12312, U16, RO, "SENSOR_DI_CHANGE_OVER_FEEDBACK", 0, 1),
+    r(12316, U16, RO, "SENSOR_DI_PRESSURE_GUARD", 0, 1),
+    r(12317, U16, RO, "SENSOR_DI_CDI_1", 0, 1),
+    r(12318, U16, RO, "SENSOR_DI_CDI_2", 0, 1),
+    r(12319, U16, RO, "SENSOR_DI_CDI_3", 0, 1),
+    r(12401, U16, RO, "SENSOR_RPM_SAF", 0, 5000),
+    r(12402, U16, RO, "SENSOR_RPM_EAF", 0, 5000),
+    r(12403, U16, RO, "SENSOR_FLOW_PIGGYBACK_SAF", UD, UD),
+    r(12404, U16, RO, "SENSOR_FLOW_PIGGYBACK_EAF", UD, UD),
+    r(12405, U16, RO, "SENSOR_DI_BYF", UD, UD),
+    r(12544, U16, RW, "SENSOR_PDM_EAT_VALUE", -400, 800),
+    r(12931, U16, RW, "MANUAL_OVERRIDE_F_INPUT_UI_RH_MODE", 0, 1),
+    r(12932, U16, RW, "MANUAL_OVERRIDE_F_INPUT_UI_CO2_MODE", 0, 1),
+    r(12933, U16, RW, "MANUAL_OVERRIDE_F_INPUT_OAT_MODE", 0, 1),
+    r(12934, U16, RW, "MANUAL_OVERRIDE_F_INPUT_SAT_MODE", 0, 1),
+    r(12935, U16, RW, "MANUAL_OVERRIDE_F_INPUT_OHT_MODE", 0, 1),
+    r(12936, U16, RW, "MANUAL_OVERRIDE_F_INPUT_FPT_MODE", 0, 1),
+    r(12937, U16, RW, "MANUAL_OVERRIDE_F_INPUT_RAT_MODE", 0, 1),
+    r(12938, U16, RW, "MANUAL_OVERRIDE_F_INPUT_EAT_MODE", 0, 1),
+    r(12939, U16, RW, "MANUAL_OVERRIDE_F_INPUT_ECT_MODE", 0, 1),
+    r(12940, U16, RW, "MANUAL_OVERRIDE_F_INPUT_EFT_MODE", 0, 1),
+    r(12941, U16, RW, "MANUAL_OVERRIDE_F_INPUT_PDM_RH_MODE", 0, 1),
+    r(12942, U16, RW, "MANUAL_OVERRIDE_F_INPUT_PDM_T_MODE", 0, 1),
+    r(12943, U16, RW, "MANUAL_OVERRIDE_INPUT_SAF_RPM_MODE", 0, 1),
+    r(12944, U16, RW, "MANUAL_OVERRIDE_INPUT_EAF_RPM_MODE", 0, 1),
+    r(12945, U16, RW, "MANUAL_OVERRIDE_INPUT_UI6_MODE", 0, 1),
+    r(12946, U16, RW, "MANUAL_OVERRIDE_INPUT_BYF_MODE", 0, 1),
+    r(12947, U16, RW, "MANUAL_OVERRIDE_INPUT_PIGGYBACK1_SAF_P_MODE", 0, 1),
+    r(12948, U16, RW, "MANUAL_OVERRIDE_INPUT_PIGGYBACK1_EAF_P_MODE", 0, 1),
+    r(12949, U16, RW, "MANUAL_OVERRIDE_INPUT_PIGGYBACK2_SAF_P_MODE", 0, 1),
+    r(12950, U16, RW, "MANUAL_OVERRIDE_INPUT_PIGGYBACK2_EAF_P_MODE", 0, 1),
+    r(12951, I16, RW, "MANUAL_OVERRIDE_INPUT_AI1_VALUE", -410, 810),
+    r(12952, I16, RW, "MANUAL_OVERRIDE_INPUT_AI2_VALUE", -410, 810),
+    r(12953, I16, RW, "MANUAL_OVERRIDE_INPUT_AI3_VALUE", -410, 810),
+    r(12954, I16, RW, "MANUAL_OVERRIDE_INPUT_AI4_VALUE", -410, 810),
+    r(12955, I16, RW, "MANUAL_OVERRIDE_INPUT_AI5_VALUE", -410, 810),
+    r(12956, I16, RW, "MANUAL_OVERRIDE_INPUT_AI6_VALUE", -410, 810),
+    r(12957, I16, RW, "MANUAL_OVERRIDE_INPUT_AI7_VALUE", -410, 810),
+    r(12958, I16, RW, "MANUAL_OVERRIDE_INPUT_DI1_VALUE", 0, 1),
+    r(12959, I16, RW, "MANUAL_OVERRIDE_INPUT_DI2_VALUE", 0, 1),
+    r(12960, I16, RW, "MANUAL_OVERRIDE_INPUT_UI1_VALUE", 0, 100),
+    r(12961, I16, RW, "MANUAL_OVERRIDE_INPUT_UI2_VALUE", 0, 100),
+    r(12962, I16, RW, "MANUAL_OVERRIDE_INPUT_UI3_VALUE", 0, 100),
+    r(12963, I16, RW, "MANUAL_OVERRIDE_INPUT_UI4_VALUE", 0, 100),
+    r(12964, I16, RW, "MANUAL_OVERRIDE_INPUT_UI5_VALUE", 0, 100),
+    r(12983, I16, RW, "MANUAL_OVERRIDE_F_INPUT_OAT_VALUE", -410, 810),
+    r(12984, I16, RW, "MANUAL_OVERRIDE_F_INPUT_SAT_VALUE", -410, 810),
+    r(12985, I16, RW, "MANUAL_OVERRIDE_F_INPUT_OHT_VALUE", -410, 810),
+    r(12986, I16, RW, "MANUAL_OVERRIDE_F_INPUT_FPT_VALUE", -410, 810),
+    r(12987, I16, RW, "MANUAL_OVERRIDE_F_INPUT_RAT_VALUE", -410, 810),
+    r(12988, I16, RW, "MANUAL_OVERRIDE_F_INPUT_EAT_VALUE", -410, 810),
+    r(12989, I16, RW, "MANUAL_OVERRIDE_F_INPUT_ECT_VALUE", -410, 810),
+    r(12990, I16, RW, "MANUAL_OVERRIDE_F_INPUT_EFT_VALUE", -410, 810),
+    r(13201, U16, RW, "OUTPUT_TRIAC_CONFIGURED", 0, 1),
+    r(13301, U16, RO, "DO1_AFTER_MUX", 0, 1),
+    r(13302, U16, RO, "DO2_AFTER_MUX", 0, 1),
+    r(13303, U16, RO, "DO3_AFTER_MUX", 0, 1),
+    r(13304, U16, RO, "DO4_AFTER_MUX", 0, 1),
+    r(13311, U16, RO, "AO1_AFTER_MUX", 0, 100),
+    r(13312, U16, RO, "AO2_AFTER_MUX", 0, 100),
+    r(13313, U16, RO, "AO3_AFTER_MUX", 0, 100),
+    r(13314, U16, RO, "AO4_AFTER_MUX", 0, 100),
+    r(13315, U16, RO, "AO5_AFTER_MUX", 0, 100),
+    r(13601, U16, RW, "MANUAL_OVERRIDE_OUTPUT_SAF", 0, 1),
+    r(13602, U16, RW, "MANUAL_OVERRIDE_OUTPUT_EAF", 0, 1),
+    r(13801, U16, RW, "MANUAL_OVERRIDE_OUTPUT_SAF_VALUE", 0, 100),
+    r(13802, U16, RW, "MANUAL_OVERRIDE_OUTPUT_EAF_VALUE", 0, 100),
+    r(14001, U16, RO, "OUTPUT_SAF", 0, 100),
+    r(14002, U16, RO, "OUTPUT_EAF", 0, 100),
+    r(14003, U16, RO, "OUTPUT_ALARM", 0, 1),
+    r(14004, U16, RO, "OUTPUT_OUTDOOR_EXTRACT_DAMPER", 0, 1),
+    r(14101, U16, RO, "OUTPUT_Y1_ANALOG", 0, 100),
+    r(14102, U16, RO, "OUTPUT_Y1_DIGITAL", 0, 1),
+    r(14103, U16, RO, "OUTPUT_Y2_ANALOG", 0, 100),
+    r(14104, U16, RO, "OUTPUT_Y2_DIGITAL", 0, 1),
+    r(14201, U16, RO, "OUTPUT_Y3_ANALOG", 0, 100),
+    r(14202, U16, RO, "OUTPUT_Y3_DIGITAL", 0, 1),
+    r(14203, U16, RO, "OUTPUT_Y4_ANALOG", 0, 100),
+    r(14204, U16, RO, "OUTPUT_Y4_DIGITAL", 0, 1),
+    r(14301, U16, RO, "OUTPUT_Y1_CIRC_PUMP", UD, UD),
+    r(14302, U16, RO, "OUTPUT_Y3_CIRC_PUMP", UD, UD),
+    r(14303, U16, RO, "OUTPUT_Y1_Y3_CIRC_PUMP", UD, UD),
+    r(14304, U16, RO, "OUTPUT_Y4_CIRC_PUMP", UD, UD),
+    r(14351, U16, RO, "OUTPUT_AO1", UD, UD),
+    r(14352, U16, RO, "OUTPUT_AO2", UD, UD),
+    r(14353, U16, RO, "OUTPUT_AO3", UD, UD),
+    r(14354, U16, RO, "OUTPUT_AO4", UD, UD),
+    r(14355, U16, RO, "OUTPUT_AO5", UD, UD),
+    r(14361, U16, RO, "OUTPUT_DO1", 0, 1),
+    r(14362, U16, RO, "OUTPUT_DO2", 0, 1),
+    r(14363, U16, RO, "OUTPUT_DO3", 0, 1),
+    r(14364, U16, RO, "OUTPUT_DO4", 0, 1),
+    r(14371, U16, RO, "OUTPUT_FAN_SPEED1", 0, 100),
+    r(14372, U16, RO, "OUTPUT_FAN_SPEED2", 0, 100),
+    r(14381, U16, RO, "OUTPUT_TRIAC", 0, 1),
+    r(15002, U16, RO, "ALARM_SAF_CTRL_ALARM", 0, 3),
+    r(15003, U16, RW, "ALARM_SAF_CTRL_CLEAR_ALARM", 0, 1),
+    r(15009, U16, RO, "ALARM_EAF_CTRL_ALARM", 0, 3),
+    r(15010, U16, RW, "ALARM_EAF_CTRL_CLEAR_ALARM", 0, 1),
+    r(15016, U16, RO, "ALARM_FROST_PROT_ALARM", 0, 3),
+    r(15017, U16, RW, "ALARM_FROST_PROT_CLEAR_ALARM", 0, 1),
+    r(15023, U16, RO, "ALARM_DEFROSTING_ALARM", 0, 3),
+    r(15024, U16, RW, "ALARM_DEFROSTING_CLEAR_ALARM", 0, 1),
+    r(15030, U16, RO, "ALARM_SAF_RPM_ALARM", 0, 3),
+    r(15031, U16, RW, "ALARM_SAF_RPM_CLEAR_ALARM", 0, 1),
+    r(15037, U16, RO, "ALARM_EAF_RPM_ALARM", 0, 3),
+    r(15038, U16, RW, "ALARM_EAF_RPM_CLEAR_ALARM", 0, 1),
+    r(15058, U16, RO, "ALARM_FPT_ALARM", 0, 3),
+    r(15059, U16, RW, "ALARM_FPT_CLEAR_ALARM", 0, 1),
+    r(15065, U16, RO, "ALARM_OAT_ALARM", 0, 3),
+    r(15066, U16, RW, "ALARM_OAT_CLEAR_ALARM", 0, 1),
+    r(15072, U16, RO, "ALARM_SAT_ALARM", 0, 3),
+    r(15073, U16, RW, "ALARM_SAT_CLEAR_ALARM", 0, 1),
+    r(15079, U16, RO, "ALARM_RAT_ALARM", 0, 3),
+    r(15080, U16, RW, "ALARM_RAT_CLEAR_ALARM", 0, 1),
+    r(15086, U16, RO, "ALARM_EAT_ALARM", 0, 3),
+    r(15087, U16, RW, "ALARM_EAT_CLEAR_ALARM", 0, 1),
+    r(15093, U16, RO, "ALARM_ECT_ALARM", 0, 3),
+    r(15094, U16, RW, "ALARM_ECT_CLEAR_ALARM", 0, 1),
+    r(15100, U16, RO, "ALARM_EFT_ALARM", 0, 3),
+    r(15101, U16, RW, "ALARM_EFT_CLEAR_ALARM", 0, 1),
+    r(15107, U16, RO, "ALARM_OHT_ALARM", 0, 3),
+    r(15108, U16, RW, "ALARM_OHT_CLEAR_ALARM", 0, 1),
+    r(15114, U16, RO, "ALARM_EMT_ALARM", 0, 3),
+    r(15115, U16, RW, "ALARM_EMT_CLEAR_ALARM", 0, 1),
+    r(15121, U16, RO, "ALARM_RGS_ALARM", 0, 3),
+    r(15122, U16, RW, "ALARM_RGS_CLEAR_ALARM", 0, 1),
+    r(15128, U16, RO, "ALARM_BYS_ALARM", 0, 3),
+    r(15129, U16, RW, "ALARM_BYS_CLEAR_ALARM", 0, 1),
+    r(15135, U16, RO, "ALARM_SECONDARY_AIR_ALARM", 0, 3),
+    r(15136, U16, RW, "ALARM_SECONDARY_AIR_CLEAR_ALARM", 0, 1),
+    r(15142, U16, RO, "ALARM_FILTER_ALARM", 0, 3),
+    r(15143, U16, RW, "ALARM_FILTER_CLEAR_ALARM", 0, 1),
+    r(15149, U16, RO, "ALARM_EXTRA_CONTROLLER_ALARM", 0, 3),
+    r(15150, U16, RW, "ALARM_EXTRA_CONTROLLER_CLEAR_ALARM", 0, 1),
+    r(15156, U16, RO, "ALARM_EXTERNAL_STOP_ALARM", 0, 3),
+    r(15157, U16, RW, "ALARM_EXTERNAL_STOP_CLEAR_ALARM", 0, 1),
+    r(15163, U16, RO, "ALARM_RH_ALARM", 0, 3),
+    r(15164, U16, RW, "ALARM_RH_CLEAR_ALARM", 0, 1),
+    r(15170, U16, RO, "ALARM_CO2_ALARM", 0, 3),
+    r(15171, U16, RW, "ALARM_CO2_CLEAR_ALARM", 0, 1),
+    r(15177, U16, RO, "ALARM_LOW_SAT_ALARM", 0, 3),
+    r(15178, U16, RW, "ALARM_LOW_SAT_CLEAR_ALARM", 0, 1),
+    r(15184, U16, RO, "ALARM_BYF_ALARM", UD, UD),
+    r(15185, U16, RW, "ALARM_BYF_CLEAR_ALARM", UD, 0),
+    r(15502, U16, RO, "ALARM_MANUAL_OVERRIDE_OUTPUTS_ALARM", 0, 3),
+    r(15503, U16, RW, "ALARM_MANUAL_OVERRIDE_OUTPUTS_CLEAR_ALARM", 0, 1),
+    r(15509, U16, RO, "ALARM_PDM_RHS_ALARM", 0, 3),
+    r(15510, U16, RW, "ALARM_PDM_RHS_CLEAR_ALARM", 0, 1),
+    r(15516, U16, RO, "ALARM_PDM_EAT_ALARM", 0, 3),
+    r(15517, U16, RW, "ALARM_PDM_EAT_CLEAR_ALARM", 0, 1),
+    r(15523, U16, RO, "ALARM_MANUAL_FAN_STOP_ALARM", 0, 3),
+    r(15524, U16, RW, "ALARM_MANUAL_FAN_STOP_CLEAR_ALARM", 0, 1),
+    r(15530, U16, RO, "ALARM_OVERHEAT_TEMPERATURE_ALARM", 0, 3),
+    r(15531, U16, RW, "ALARM_OVERHEAT_TEMPERATURE_CLEAR_ALARM", 0, 1),
+    r(15537, U16, RO, "ALARM_FIRE_ALARM_ALARM", 0, 3),
+    r(15538, U16, RW, "ALARM_FIRE_ALARM_CLEAR_ALARM", 0, 1),
+    r(15544, U16, RO, "ALARM_FILTER_WARNING_ALARM", 0, 3),
+    r(15545, U16, RW, "ALARM_FILTER_WARNING_CLEAR_ALARM", 0, 1),
+    r(15549, U16, RO, "ALARM_FILTER_WARNING_ALARM_ERROR_DURATION_COUNTER", UD, UD),
+    r(15701, U16, RO, "ALARM_LOG_1_ID", UD, UD),
+    r(15702, U16, RO, "ALARM_LOG_1_STATE_NOW", UD, UD),
+    r(15703, U16, RO, "ALARM_LOG_1_STATE_PREVIOUS", UD, UD),
+    r(15704, U16, RO, "ALARM_LOG_1_YEAR", UD, UD),
+    r(15705, U16, RO, "ALARM_LOG_1_MONTH", UD, UD),
+    r(15706, U16, RO, "ALARM_LOG_1_DAY", UD, UD),
+    r(15707, U16, RO, "ALARM_LOG_1_HOUR", UD, UD),
+    r(15708, U16, RO, "ALARM_LOG_1_MINUTE", UD, UD),
+    r(15709, U16, RO, "ALARM_LOG_1_SECOND", UD, UD),
+    r(15710, U16, RO, "ALARM_LOG_1_CODE", UD, UD),
+    r(15711, U16, RO, "ALARM_LOG_2_ID", UD, UD),
+    r(15712, U16, RO, "ALARM_LOG_2_STATE_NOW", UD, UD),
+    r(15713, U16, RO, "ALARM_LOG_2_STATE_PREVIOUS", UD, UD),
+    r(15714, U16, RO, "ALARM_LOG_2_YEAR", UD, UD),
+    r(15715, U16, RO, "ALARM_LOG_2_MONTH", UD, UD),
+    r(15716, U16, RO, "ALARM_LOG_2_DAY", UD, UD),
+    r(15717, U16, RO, "ALARM_LOG_2_HOUR", UD, UD),
+    r(15718, U16, RO, "ALARM_LOG_2_MINUTE", UD, UD),
+    r(15719, U16, RO, "ALARM_LOG_2_SECOND", UD, UD),
+    r(15720, U16, RO, "ALARM_LOG_2_CODE", UD, UD),
+    r(15721, U16, RO, "ALARM_LOG_3_ID", UD, UD),
+    r(15722, U16, RO, "ALARM_LOG_3_STATE_NOW", UD, UD),
+    r(15723, U16, RO, "ALARM_LOG_3_STATE_PREVIOUS", UD, UD),
+    r(15724, U16, RO, "ALARM_LOG_3_YEAR", UD, UD),
+    r(15725, U16, RO, "ALARM_LOG_3_MONTH", UD, UD),
+    r(15726, U16, RO, "ALARM_LOG_3_DAY", UD, UD),
+    r(15727, U16, RO, "ALARM_LOG_3_HOUR", UD, UD),
+    r(15728, U16, RO, "ALARM_LOG_3_MINUTE", UD, UD),
+    r(15729, U16, RO, "ALARM_LOG_3_SECOND", UD, UD),
+    r(15730, U16, RO, "ALARM_LOG_3_CODE", UD, UD),
+    r(15731, U16, RO, "ALARM_LOG_4_ID", UD, UD),
+    r(15732, U16, RO, "ALARM_LOG_4_STATE_NOW", UD, UD),
+    r(15733, U16, RO, "ALARM_LOG_4_STATE_PREVIOUS", UD, UD),
+    r(15734, U16, RO, "ALARM_LOG_4_YEAR", UD, UD),
+    r(15735, U16, RO, "ALARM_LOG_4_MONTH", UD, UD),
+    r(15736, U16, RO, "ALARM_LOG_4_DAY", UD, UD),
+    r(15737, U16, RO, "ALARM_LOG_4_HOUR", UD, UD),
+    r(15738, U16, RO, "ALARM_LOG_4_MINUTE", UD, UD),
+    r(15739, U16, RO, "ALARM_LOG_4_SECOND", UD, UD),
+    r(15740, U16, RO, "ALARM_LOG_4_CODE", UD, UD),
+    r(15741, U16, RO, "ALARM_LOG_5_ID", UD, UD),
+    r(15742, U16, RO, "ALARM_LOG_5_STATE_NOW", UD, UD),
+    r(15743, U16, RO, "ALARM_LOG_5_STATE_PREVIOUS", UD, UD),
+    r(15744, U16, RO, "ALARM_LOG_5_YEAR", UD, UD),
+    r(15745, U16, RO, "ALARM_LOG_5_MONTH", UD, UD),
+    r(15746, U16, RO, "ALARM_LOG_5_DAY", UD, UD),
+    r(15747, U16, RO, "ALARM_LOG_5_HOUR", UD, UD),
+    r(15748, U16, RO, "ALARM_LOG_5_MINUTE", UD, UD),
+    r(15749, U16, RO, "ALARM_LOG_5_SECOND", UD, UD),
+    r(15750, U16, RO, "ALARM_LOG_5_CODE", UD, UD),
+    r(15751, U16, RO, "ALARM_LOG_6_ID", UD, UD),
+    r(15752, U16, RO, "ALARM_LOG_6_STATE_NOW", UD, UD),
+    r(15753, U16, RO, "ALARM_LOG_6_STATE_PREVIOUS", UD, UD),
+    r(15754, U16, RO, "ALARM_LOG_6_YEAR", UD, UD),
+    r(15755, U16, RO, "ALARM_LOG_6_MONTH", UD, UD),
+    r(15756, U16, RO, "ALARM_LOG_6_DAY", UD, UD),
+    r(15757, U16, RO, "ALARM_LOG_6_HOUR", UD, UD),
+    r(15758, U16, RO, "ALARM_LOG_6_MINUTE", UD, UD),
+    r(15759, U16, RO, "ALARM_LOG_6_SECOND", UD, UD),
+    r(15760, U16, RO, "ALARM_LOG_6_CODE", UD, UD),
+    r(15761, U16, RO, "ALARM_LOG_7_ID", UD, UD),
+    r(15762, U16, RO, "ALARM_LOG_7_STATE_NOW", UD, UD),
+    r(15763, U16, RO, "ALARM_LOG_7_STATE_PREVIOUS", UD, UD),
+    r(15764, U16, RO, "ALARM_LOG_7_YEAR", UD, UD),
+    r(15765, U16, RO, "ALARM_LOG_7_MONTH", UD, UD),
+    r(15766, U16, RO, "ALARM_LOG_7_DAY", UD, UD),
+    r(15767, U16, RO, "ALARM_LOG_7_HOUR", UD, UD),
+    r(15768, U16, RO, "ALARM_LOG_7_MINUTE", UD, UD),
+    r(15769, U16, RO, "ALARM_LOG_7_SECOND", UD, UD),
+    r(15770, U16, RO, "ALARM_LOG_7_CODE", UD, UD),
+    r(15771, U16, RO, "ALARM_LOG_8_ID", UD, UD),
+    r(15772, U16, RO, "ALARM_LOG_8_STATE_NOW", UD, UD),
+    r(15773, U16, RO, "ALARM_LOG_8_STATE_PREVIOUS", UD, UD),
+    r(15774, U16, RO, "ALARM_LOG_8_YEAR", UD, UD),
+    r(15775, U16, RO, "ALARM_LOG_8_MONTH", UD, UD),
+    r(15776, U16, RO, "ALARM_LOG_8_DAY", UD, UD),
+    r(15777, U16, RO, "ALARM_LOG_8_HOUR", UD, UD),
+    r(15778, U16, RO, "ALARM_LOG_8_MINUTE", UD, UD),
+    r(15779, U16, RO, "ALARM_LOG_8_SECOND", UD, UD),
+    r(15780, U16, RO, "ALARM_LOG_8_CODE", UD, UD),
+    r(15781, U16, RO, "ALARM_LOG_9_ID", UD, UD),
+    r(15782, U16, RO, "ALARM_LOG_9_STATE_NOW", UD, UD),
+    r(15783, U16, RO, "ALARM_LOG_9_STATE_PREVIOUS", UD, UD),
+    r(15784, U16, RO, "ALARM_LOG_9_YEAR", UD, UD),
+    r(15785, U16, RO, "ALARM_LOG_9_MONTH", UD, UD),
+    r(15786, U16, RO, "ALARM_LOG_9_DAY", UD, UD),
+    r(15787, U16, RO, "ALARM_LOG_9_HOUR", UD, UD),
+    r(15788, U16, RO, "ALARM_LOG_9_MINUTE", UD, UD),
+    r(15789, U16, RO, "ALARM_LOG_9_SECOND", UD, UD),
+    r(15790, U16, RO, "ALARM_LOG_9_CODE", UD, UD),
+    r(15791, U16, RO, "ALARM_LOG_10_ID", UD, UD),
+    r(15792, U16, RO, "ALARM_LOG_10_STATE_NOW", UD, UD),
+    r(15793, U16, RO, "ALARM_LOG_10_STATE_PREVIOUS", UD, UD),
+    r(15794, U16, RO, "ALARM_LOG_10_YEAR", UD, UD),
+    r(15795, U16, RO, "ALARM_LOG_10_MONTH", UD, UD),
+    r(15796, U16, RO, "ALARM_LOG_10_DAY", UD, UD),
+    r(15797, U16, RO, "ALARM_LOG_10_HOUR", UD, UD),
+    r(15798, U16, RO, "ALARM_LOG_10_MINUTE", UD, UD),
+    r(15799, U16, RO, "ALARM_LOG_10_SECOND", UD, UD),
+    r(15800, U16, RO, "ALARM_LOG_10_CODE", UD, UD),
+    r(15801, U16, RO, "ALARM_LOG_11_ID", UD, UD),
+    r(15802, U16, RO, "ALARM_LOG_11_STATE_NOW", UD, UD),
+    r(15803, U16, RO, "ALARM_LOG_11_STATE_PREVIOUS", UD, UD),
+    r(15804, U16, RO, "ALARM_LOG_11_YEAR", UD, UD),
+    r(15805, U16, RO, "ALARM_LOG_11_MONTH", UD, UD),
+    r(15806, U16, RO, "ALARM_LOG_11_DAY", UD, UD),
+    r(15807, U16, RO, "ALARM_LOG_11_HOUR", UD, UD),
+    r(15808, U16, RO, "ALARM_LOG_11_MINUTE", UD, UD),
+    r(15809, U16, RO, "ALARM_LOG_11_SECOND", UD, UD),
+    r(15810, U16, RO, "ALARM_LOG_11_CODE", UD, UD),
+    r(15811, U16, RO, "ALARM_LOG_12_ID", UD, UD),
+    r(15812, U16, RO, "ALARM_LOG_12_STATE_NOW", UD, UD),
+    r(15813, U16, RO, "ALARM_LOG_12_STATE_PREVIOUS", UD, UD),
+    r(15814, U16, RO, "ALARM_LOG_12_YEAR", UD, UD),
+    r(15815, U16, RO, "ALARM_LOG_12_MONTH", UD, UD),
+    r(15816, U16, RO, "ALARM_LOG_12_DAY", UD, UD),
+    r(15817, U16, RO, "ALARM_LOG_12_HOUR", UD, UD),
+    r(15818, U16, RO, "ALARM_LOG_12_MINUTE", UD, UD),
+    r(15819, U16, RO, "ALARM_LOG_12_SECOND", UD, UD),
+    r(15820, U16, RO, "ALARM_LOG_12_CODE", UD, UD),
+    r(15821, U16, RO, "ALARM_LOG_13_ID", UD, UD),
+    r(15822, U16, RO, "ALARM_LOG_13_STATE_NOW", UD, UD),
+    r(15823, U16, RO, "ALARM_LOG_13_STATE_PREVIOUS", UD, UD),
+    r(15824, U16, RO, "ALARM_LOG_13_YEAR", UD, UD),
+    r(15825, U16, RO, "ALARM_LOG_13_MONTH", UD, UD),
+    r(15826, U16, RO, "ALARM_LOG_13_DAY", UD, UD),
+    r(15827, U16, RO, "ALARM_LOG_13_HOUR", UD, UD),
+    r(15828, U16, RO, "ALARM_LOG_13_MINUTE", UD, UD),
+    r(15829, U16, RO, "ALARM_LOG_13_SECOND", UD, UD),
+    r(15830, U16, RO, "ALARM_LOG_13_CODE", UD, UD),
+    r(15831, U16, RO, "ALARM_LOG_14_ID", UD, UD),
+    r(15832, U16, RO, "ALARM_LOG_14_STATE_NOW", UD, UD),
+    r(15833, U16, RO, "ALARM_LOG_14_STATE_PREVIOUS", UD, UD),
+    r(15834, U16, RO, "ALARM_LOG_14_YEAR", UD, UD),
+    r(15835, U16, RO, "ALARM_LOG_14_MONTH", UD, UD),
+    r(15836, U16, RO, "ALARM_LOG_14_DAY", UD, UD),
+    r(15837, U16, RO, "ALARM_LOG_14_HOUR", UD, UD),
+    r(15838, U16, RO, "ALARM_LOG_14_MINUTE", UD, UD),
+    r(15839, U16, RO, "ALARM_LOG_14_SECOND", UD, UD),
+    r(15840, U16, RO, "ALARM_LOG_14_CODE", UD, UD),
+    r(15841, U16, RO, "ALARM_LOG_15_ID", UD, UD),
+    r(15842, U16, RO, "ALARM_LOG_15_STATE_NOW", UD, UD),
+    r(15843, U16, RO, "ALARM_LOG_15_STATE_PREVIOUS", UD, UD),
+    r(15844, U16, RO, "ALARM_LOG_15_YEAR", UD, UD),
+    r(15845, U16, RO, "ALARM_LOG_15_MONTH", UD, UD),
+    r(15846, U16, RO, "ALARM_LOG_15_DAY", UD, UD),
+    r(15847, U16, RO, "ALARM_LOG_15_HOUR", UD, UD),
+    r(15848, U16, RO, "ALARM_LOG_15_MINUTE", UD, UD),
+    r(15849, U16, RO, "ALARM_LOG_15_SECOND", UD, UD),
+    r(15850, U16, RO, "ALARM_LOG_15_CODE", UD, UD),
+    r(15851, U16, RO, "ALARM_LOG_16_ID", UD, UD),
+    r(15852, U16, RO, "ALARM_LOG_16_STATE_NOW", UD, UD),
+    r(15853, U16, RO, "ALARM_LOG_16_STATE_PREVIOUS", UD, UD),
+    r(15854, U16, RO, "ALARM_LOG_16_YEAR", UD, UD),
+    r(15855, U16, RO, "ALARM_LOG_16_MONTH", UD, UD),
+    r(15856, U16, RO, "ALARM_LOG_16_DAY", UD, UD),
+    r(15857, U16, RO, "ALARM_LOG_16_HOUR", UD, UD),
+    r(15858, U16, RO, "ALARM_LOG_16_MINUTE", UD, UD),
+    r(15859, U16, RO, "ALARM_LOG_16_SECOND", UD, UD),
+    r(15860, U16, RO, "ALARM_LOG_16_CODE", UD, UD),
+    r(15861, U16, RO, "ALARM_LOG_17_ID", UD, UD),
+    r(15862, U16, RO, "ALARM_LOG_17_STATE_NOW", UD, UD),
+    r(15863, U16, RO, "ALARM_LOG_17_STATE_PREVIOUS", UD, UD),
+    r(15864, U16, RO, "ALARM_LOG_17_YEAR", UD, UD),
+    r(15865, U16, RO, "ALARM_LOG_17_MONTH", UD, UD),
+    r(15866, U16, RO, "ALARM_LOG_17_DAY", UD, UD),
+    r(15867, U16, RO, "ALARM_LOG_17_HOUR", UD, UD),
+    r(15868, U16, RO, "ALARM_LOG_17_MINUTE", UD, UD),
+    r(15869, U16, RO, "ALARM_LOG_17_SECOND", UD, UD),
+    r(15870, U16, RO, "ALARM_LOG_17_CODE", UD, UD),
+    r(15871, U16, RO, "ALARM_LOG_18_ID", UD, UD),
+    r(15872, U16, RO, "ALARM_LOG_18_STATE_NOW", UD, UD),
+    r(15873, U16, RO, "ALARM_LOG_18_STATE_PREVIOUS", UD, UD),
+    r(15874, U16, RO, "ALARM_LOG_18_YEAR", UD, UD),
+    r(15875, U16, RO, "ALARM_LOG_18_MONTH", UD, UD),
+    r(15876, U16, RO, "ALARM_LOG_18_DAY", UD, UD),
+    r(15877, U16, RO, "ALARM_LOG_18_HOUR", UD, UD),
+    r(15878, U16, RO, "ALARM_LOG_18_MINUTE", UD, UD),
+    r(15879, U16, RO, "ALARM_LOG_18_SECOND", UD, UD),
+    r(15880, U16, RO, "ALARM_LOG_18_CODE", UD, UD),
+    r(15881, U16, RO, "ALARM_LOG_19_ID", UD, UD),
+    r(15882, U16, RO, "ALARM_LOG_19_STATE_NOW", UD, UD),
+    r(15883, U16, RO, "ALARM_LOG_19_STATE_PREVIOUS", UD, UD),
+    r(15884, U16, RO, "ALARM_LOG_19_YEAR", UD, UD),
+    r(15885, U16, RO, "ALARM_LOG_19_MONTH", UD, UD),
+    r(15886, U16, RO, "ALARM_LOG_19_DAY", UD, UD),
+    r(15887, U16, RO, "ALARM_LOG_19_HOUR", UD, UD),
+    r(15888, U16, RO, "ALARM_LOG_19_MINUTE", UD, UD),
+    r(15889, U16, RO, "ALARM_LOG_19_SECOND", UD, UD),
+    r(15890, U16, RO, "ALARM_LOG_19_CODE", UD, UD),
+    r(15891, U16, RO, "ALARM_LOG_20_ID", UD, UD),
+    r(15892, U16, RO, "ALARM_LOG_20_STATE_NOW", UD, UD),
+    r(15893, U16, RO, "ALARM_LOG_20_STATE_PREVIOUS", UD, UD),
+    r(15894, U16, RO, "ALARM_LOG_20_YEAR", UD, UD),
+    r(15895, U16, RO, "ALARM_LOG_20_MONTH", UD, UD),
+    r(15896, U16, RO, "ALARM_LOG_20_DAY", UD, UD),
+    r(15897, U16, RO, "ALARM_LOG_20_HOUR", UD, UD),
+    r(15898, U16, RO, "ALARM_LOG_20_MINUTE", UD, UD),
+    r(15899, U16, RO, "ALARM_LOG_20_SECOND", UD, UD),
+    r(15900, U16, RO, "ALARM_LOG_20_CODE", UD, UD),
+    r(15901, U16, RO, "ALARM_TYPE_A", 0, 1),
+    r(15902, U16, RO, "ALARM_TYPE_B", 0, 1),
+    r(15903, U16, RO, "ALARM_TYPE_C", 0, 1),
+    r(16001, U16, RW, "PASSWD_ADMIN", UD, UD),
+    r(16002, U16, RW, "LOCKED_USER", 0, 1),
+    r(16003, U16, RW, "LOCKED_FILTER", 0, 1),
+    r(16004, U16, RW, "LOCKED_WEEK_SCHEDULE", 0, 1),
+    r(16051, U16, RW, "PASSWD_USER_LEVEL_REQUIRED", 0, 1),
+    r(16052, U16, RW, "PASSWD_FILTER_REQUIRED", 0, 1),
+    r(16053, U16, RW, "PASSWD_WEEK_SCHEDULE_REQUIRED", 0, 1),
+    r(16061, U16, RW, "PASSWD_PC_SETTINGS", UD, UD),
+    r(16062, U16, RO, "PASSWD_PC_UNLOCKED", 0, 1),
+    r(16101, U16, RW, "SUW_REQUIRED", 0, 1),
+    r(17001, U16, RW, "COMM_MODBUS_ADDRESS", 0, 255),
+    r(17002, U16, RW, "COMM_MODBUS_BAUD_RATE", 0, 10),
+    r(17003, U16, RW, "COMM_MODBUS_PARITY", 0, 2),
+    r(30101, U16, RW, "FACTORY_RESET", 3228, 3228),
+    r(30103, U16, RW, "SET_USER_SAFE_CONFIG", 0, 1),
+    r(30104, U16, RW, "ACTIVATE_USER_SAFE_CONFIG", 0, 1),
+    r(30105, U16, RO, "USER_SAFE_CONFIG_VALID", UD, UD),
+    r(30106, U16, RO, "SAFE_CONFIG_VALID", UD, UD),
 ]);
+
+function d(register: number | number[], description: string) {
+    if (typeof register === 'number') {
+        registers.get(register)!.description = description;
+    } else {
+        for (let r of register) {
+            d(r, description);
+        }
+    }
+}
+
+d(1001, "Highest value of all RH sensors");
+d(1002, "Highest value of all CO2 sensors");
+d(1011, "Set point for RH demand control");
+d(1012, "Sensor value for RH demand control");
+d(1019, "Output value for RH demand control. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1021, "Set point for CO2 demand control");
+d(1022, "Sensor value for CO2 demand control");
+d(1029, "Output value for CO2 demand control. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1031, "Pband setting for RH demand control");
+d(1033, "Set point setting for RH demand control winter time");
+d(1034, "Set point setting for RH demand control summer time");
+d(1035, "Flag indicating if RH demand control is allowed");
+d(1039, "Actual seasson for Demand Control\n0: Summer\n1: Winter");
+d(1041, "Pband setting for CO2 demand control");
+d(1043, "Set point setting for CO2 demand control");
+d(1044, "Flag indicating if CO2 demand control isallowed");
+d(1101, "Time delay setting for user mode Holiday");
+d(1102, "Time delay setting for user mode Away");
+d(1103, "Time delay setting for user mode Fire Place");
+d(1104, "Time delay setting for user mode Refresh");
+d(1105, "Time delay setting for user mode Crowded");
+d([1111, 1112], "Remaining time for the state Holiday/Away/Fire Place/Refresh/Crowded");
+d(1121, "Minimum level for Demand Control\n2: Low\n3: Normal");
+d(1122, "Maximum level for user Demand Control\n3: Normal\n4: High\n5: Maximum");
+d(1123, "Actual IAQ level:\n0: Economic\n1: Good\n2: Improving");
+d(1131, "Fan speed level for mode Manual. Applies to both the SAF and the EAF fan.\n0: Off(1)\n2: Low\n3: Normal\n4: High\n(1): value Off only allowed if contents of register REG_FAN_MANUAL_STOP_ALLOWED is 1.");
+d([1135, 1136], "Fan speed level for mode Crowded\n3: Normal\n4: High\n5: Maximum");
+d([1137, 1138], "Fan speed level for mode Refresh\n3: Normal\n4: High\n5: Maximum");
+d([1139, 1140], "Fan speed level for mode Fire Place\n1: Minimum\n2: Low\n3: Normal");
+d([1141, 1142], "Fan speed level for mode Away. Value Off only allowed if contents of register REG_FAN_MANUAL_STOP_ALLOWED is 1.");
+d([1143, 1144], "Fan speed level for mode Holiday. Value Off only allowed if contents of register REG_FAN_MANUAL_STOP_ALLOWED is 1.");
+d([1145, 1146], "Fan speed level for mode Cooker Hood\n1: Minimum\n2: Low\n3: Normal");
+d([1147, 1148], "Fan speed level for mode Vacuum Cleaner\n1: Minimum\n2: Low\n3: Normal");
+d(1151, "Temperature setpoint offset for user mode Crowded");
+d(1161, "Active User mode.\n0: Auto\n1: Manual\n2: Crowded\n3: Refresh\n4: Fireplace\n5: Away\n6: Holiday\n7: Cooker Hood\n8: Vacuum Cleaner\n9: CDI1\n10: CDI2\n11: CDI3\n12: PressureGuard");
+d(1162, "New desired user mode as requested by HMI\n0: None\n1: AUTO\n2: Manual\n3: Crowded\n4: Refresh\n5: Fireplace\n6: Away\n7: Holiday");
+d([
+    1171,
+    1172,
+    1173,
+    1174,
+    1175,
+    1176
+], "Fan speed level for configurable digital input 3.\n0: Off\n1: Minimum\n2: Low\n3: Normal\n4: High\n5: Maximum");
+d([1177, 1178], "Fan speed level for configurable pressure guard function.\n0: Off\n1: Minimum\n2: Low\n3: Normal\n4: High\n5: Maximum");
+d([
+    1181,
+    1182,
+    1183,
+    1184,
+    1185,
+    1188,
+    1189,
+    1190
+], "Off delay for DI");
+d(1221, "SAF speed value for user mode Holiday. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1222, "EAF speed value for user mode Holiday. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1223, "SAF speed value for mode Cooker Hood. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1224, "EAF speed value for mode Cooker Hood. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1225, "SAF speed value for mode Vacuum Cleaner. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1226, "EAF speed value for mode Vacuum Cleaner. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1227, "SAF speed value for low fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1228, "EAF speed value for low fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1251, "Compensate only SF or both SF and EF\n0: SAF\n1: SAF/EAF");
+d(1252, "Compensation value at lowest temperature.");
+d(1253, "Temperature at which compensation reaches maximum value during the winter period.");
+d(1254, "Temperature at which highest compensation is applied.");
+d(1256, "Temperature at which compensation starts during the winter period.");
+d(1257, "Temperature at which compensation starts during the summer period.");
+d(1258, "Temperature at which compensation reaches maximum value during the summer period.");
+d(1259, "Compensation value during summer period");
+d(1274, "Type of fan control mode.\n0: Manual\n1: RPM\n2: VAV (Constant Pressure)\n3: CAV (Constant Flow)4: DCV (External)");
+d(1301, "SAF speed value for minimum fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1302, "EAF speed value for minimum fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1303, "SAF speed value for low fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1304, "EAF speed value for low fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1305, "SAF speed value for normal fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1306, "EAF speed value for normal fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1307, "SAF speed value for high fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1308, "EAF speed value for high fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1309, "SAF speed value for maximum fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1310, "EAF speed value for maximum fan speed. (1): Depends on regulation type. Value can be %, RPM, Pressure or Flow");
+d(1351, "Indicates that both fans are running");
+d(1352, "Indicates that the SAF shall be turned off once the electrical reheater is cooled down.");
+d(1353, "Allow manual fan stop (also as selection for user modes and Week schedule).\n0: Manual stop not allowed\n1: Manual stop allowed");
+d(1357, "Electrical Heater hot counter. Count down from 120 sec.");
+d(1358, "Supply Air Fan Speed Level After Heater Cooling Down");
+d(1359, "Extract Air Fan Speed Level After Heater Cooling Down");
+d(1401, "SAF speed value for minimum fan speed");
+d(1402, "EAF speed value for minimum fan speed");
+d(1403, "SAF speed value for low fan speed");
+d(1404, "EAF speed value for low fan speed");
+d(1405, "SAF speed value for normal fan speed");
+d(1406, "EAF speed value for normal fan speed");
+d(1407, "SAF speed value for high fan speed");
+d(1408, "EAF speed value for high fan speed");
+d(1409, "SAF speed value for maximum fan speed");
+d(1410, "EAF speed value for maximum fan speed");
+d(1411, "SAF speed value for minimum fan speed");
+d(1412, "EAF speed value for minimum fan speed");
+d(1413, "SAF speed value for low fan speed");
+d(1414, "EAF speed value for low fan speed");
+d(1415, "SAF speed value for normal fan speed");
+d(1416, "EAF speed value for normal fan speed");
+d(1417, "SAF speed value for high fan speed");
+d(1418, "EAF speed value for high fan speed");
+d(1419, "SAF speed value for maximum fan speed");
+d(1420, "EAF speed value for maximum fan speed");
+d(1421, "SAF speed value for minimum fan speed");
+d(1422, "EAF speed value for minimum fan speed");
+d(1423, "SAF speed value for low fan speed");
+d(1424, "EAF speed value for low fan speed");
+d(1425, "SAF speed value for normal fan speed");
+d(1426, "EAF speed value for normal fan speed");
+d(1427, "SAF speed value for high fan speed");
+d(1428, "EAF speed value for high fan speed");
+d(1429, "SAF speed value for maximum fan speed");
+d(1430, "EAF speed value for maximum fan speed");
+d(1431, "SAF speed value for minimum fan speed");
+d(1432, "EAF speed value for minimum fan speed");
+d(1433, "SAF speed value for low fan speed");
+d(1434, "EAF speed value for low fan speed");
+d(1435, "SAF speed value for normal fan speed");
+d(1436, "EAF speed value for normal fan speed");
+d(1437, "SAF speed value for high fan speed");
+d(1438, "EAF speed value for high fan speed");
+d(1439, "SAF speed value for maximum fan speed");
+d(1440, "EAF speed value for maximum fan speed");
+d(1621, "Remaining time");
+d(1623, "Remaining time");
+d(1625, "Remaining time");
+d(2001, "Temperature setpoint for the supply airtemperature");
+d(2013, "Temperature set point for SATC, as calculated by RATC/EATC during cascade control");
+d(2021, "Minimum temperature set point for the SATC");
+d(2022, "Maximum temperature set point for the SATC");
+d(2031, "Unit temperature control mode\n0: Supply\n1: Room\n2: Extract");
+d(2051, "EAT or RAT value, used for room/extract air controller.");
+d(2053, "Temperature set point for SATC, as calculated by RATC/EATC during cascade control");
+d(2054, "Temperature setpoint for the supply airtemperature");
+d(2055, "Output of the SATC (0-100%)");
+d(2061, "SATC setpoint value");
+d(2069, "SATC output signal");
+d(2071, "RATC setpoint value");
+d(2079, "RATC output signal");
+d(2101, "Value from External Controller Input, SAF. In %.");
+d(2102, "Value from External Controller Input, EAF. In %.");
+d(2113, "Temperature at which the Heater circulation pump is started");
+d(2122, "Off time delay for the heater circulation pump in minutes");
+d(2134, "Enabling of cooling recovery");
+d(2147, "Indicates if RH trasnfer control shall beapplied");
+d(2149, "TRIAC after manual override");
+d(2201, "Pband setting for RH transfer control");
+d(2202, "Itime setting for RH transfer control");
+d(2203, "Set point setting for RH transfer control");
+d(2204, "Enabling of humidity transfer control");
+d(2211, "Extract air specific humidity (g/kg)");
+d(2212, "Outdoor air specific humidity at assumed 90% RH outdoors");
+d(2213, "Moisture transfer control specific humidity setpoint");
+d(2311, "Cooler signal");
+d(2314, "Temperature at which the cooler circulation pump is started");
+d(2315, "Temperature at which cooling recovery is allowed");
+d(2316, "Temperature at which cooling is interlocked");
+d(2317, "Off time delay for the cooler circulation pump in minutes");
+d(2403, "Set point value for the extra controller PI regulator");
+d(2404, "Start temperature for extra controller circulation pump");
+d(2405, "Off time delay for the extra controller circulation pump in minutes");
+d(2418, "Temperature setpoint for the preheater.\n0: Auto\n1: Manual");
+d(2451, "Start temperature for the change-over circulation pump");
+d(2452, "Off time delay for the change-over circulation pump in minutes");
+d(2504, "Temperature offset for heating during Eco mode");
+d(2505, "Enabling of eco mode");
+d(2506, "Indicates if conditions for ECO mode are");
+d(3101, "Is the function currently active?");
+d(3102, "Is the function currently active?");
+d(3103, "Is the function currently active?");
+d(3104, "Is the function currently active?");
+d(3105, "Is the function currently active?");
+d(3106, "Is the function currently active?");
+d(3107, "Is the function currently active?");
+d(3108, "Is the function currently active?");
+d(3109, "Is the function currently active?");
+d(3110, "Is the function currently active?");
+d(3111, "Is the function currently active?");
+d(3112, "Is the function currently active?");
+d(3113, "Is the function currently active?");
+d(3114, "Is the function currently active?");
+d(3115, "Is the function currently active?");
+d(3116, "Is the function currently active?");
+d(3117, "Is the function currently active?");
+d(4101, "Indicates if free cooling is enabled");
+d(4102, "Minimum of highest daytime temperature for start of free cooling.");
+d(4103, "Highest night temperature limit for termination free cooling");
+d(4104, "Lowest night temperature limit for termination free cooling");
+d(4105, "Lowest temperature room temperature for termination of free cooling");
+d(4106, "Start time of free cooling night-period, hour. Valid range is from 0 to 8 and from 21 to 23.");
+d(4107, "Start time of free cooling night-period, Minute");
+d(4108, "End time of free cooling night-period, hour. Valid range is from 0 to 8 and from 21 to 23.");
+d(4109, "End time of free cooling night-period, Minute");
+d(4111, "Indicates if free cooling is being performed");
+d(4112, "Minimum speed level during free cooling, SAF.\n3: Normal\n4: High\n5: Maximum");
+d(4113, "Minimum speed level during free cooling, EAF.\n3: Normal\n4: High\n5: Maximum");
+d(5001, "Temperature offset during active week schedule.");
+d(5002, "Temperature offset during inactive week schedule.");
+d(5003, "Monday, Period 1, start");
+d(5005, "Monday, Period 1, end");
+d(5007, "Monday, Period 2, start");
+d(5009, "Monday, Period 2, end");
+d(5011, "Tuesday, Period 1, start");
+d(5013, "Tuesday, Period 1, end");
+d(5015, "Tuesday, Period 2, start");
+d(5017, "Tuesday, Period 2, end");
+d(5019, "Wednesday, Period 1, start");
+d(5021, "Wednesday, Period 1, end");
+d(5023, "Wednesday, Period 2, start");
+d(5025, "Wednesday, Period 2, end");
+d(5027, "Thursday, Period 1, start");
+d(5029, "Thursday, Period 1, end");
+d(5031, "Thursday, Period 2, start");
+d(5033, "Thursday, Period 2, end");
+d(5035, "Friday, Period 1, start");
+d(5037, "Friday, Period 1, end");
+d(5039, "Friday, Period 2, start");
+d(5041, "Friday, Period 2, end");
+d(5043, "Saturday, Period 1, start");
+d(5045, "Saturday, Period 1, end");
+d(5047, "Saturday, Period 2, start");
+d(5049, "Saturday, Period 2, end");
+d(5051, "Sunday, Period 1, start");
+d(5053, "Sunday, Period 1, end");
+d(5055, "Sunday, Period 2, start");
+d(5057, "Sunday, Period 2, end");
+d(5059, "Indicates that the current time lays within the indicated intervals");
+d(5060, "Fan speed levels for SAF and EAF during active week schedule.\n1: Off(1)\n2: Low\n3: Normal\n4: High\n5: Demand(2)\n(1): Off available if Manual Fan Stop is enabled.\n(2): Demand available if demand control active or external fan control enabled.");
+d(5061, "Fan speed levels for SAF and EAF during inactive week schedule.\n1: Off(1)\n2: Low\n3: Normal\n4: High\n5: Demand(2)\n(1): Off available if Manual Fan Stop is enabled.\n(2): Demand available if demand control active or external fan control enabled.");
+d(5101, "Flag indicating if this period is enabled.");
+d(5102, "Flag indicating if this period is enabled.");
+d(5103, "Flag indicating if this period is enabled.");
+d(5104, "Flag indicating if this period is enabled.");
+d(5105, "Flag indicating if this period is enabled.");
+d(5106, "Flag indicating if this period is enabled.");
+d(5107, "Flag indicating if this period is enabled.");
+d(5108, "Flag indicating if this period is enabled.");
+d(5109, "Flag indicating if this period is enabled.");
+d(5110, "Flag indicating if this period is enabled.");
+d(5111, "Flag indicating if this period is enabled.");
+d(5112, "Flag indicating if this period is enabled.");
+d(5113, "Flag indicating if this period is enabled.");
+d(5114, "Flag indicating if this period is enabled.");
+d(6001, "Current time");
+d(6002, "Current time");
+d(6003, "Current time");
+d(6004, "Current time");
+d(6005, "Current time");
+d(6006, "Current time");
+d(6007, "Flag indicating if DST is enabled.\n0: Daylight saving time not enabled\n1: Daylight saving time enabled");
+d(6008, "Indicaties the presentation of time in the HMI. 24H/12H");
+d(6009, "Monday (0)...Sunday (6)");
+d(6011, "Now time in seconds. Lower 16 bits.");
+d(6012, "Now time in seconds. Higher 16 bits.");
+d(6101, "RTC value in seconds, highest 16 bits");
+d(7001, "Filter replacement time in months");
+d(7002, "Timestamp of latest filter replcement, lower 16 bits");
+d(7003, "Timestamp of latest filter replcement, higher 16 bits");
+d(7004, "Indicates that the LastFilterReplacementTime shall be set Now.");
+d(7005, "Remaining filter time in seconds, lower 16 bits.");
+d(7006, "Remaining filter time in seconds, higher 16 bits.");
+d(7007, "Indicates if the filter warning alarm wasgenerated.");
+d(9001, "Unit for CAV control mode.\n0: l/s 1: m3/h2:cfm");
+d(9002, "Units for VAV control mode.\n0: Pa 1: InH2O");
+d(9003, "Units for temperature.\n0: Celcius\n1: Fahrenheit");
+d(11401, "Indicates what kind of DI functionality is connected to DI1.\n0: None /Away/BYP/Vacuum Cleaner/Cooker Hood/Crowded/EMT/External Stop/Extra Controller Alarm/Fireplace/Holiday/Refresh/RGS/Change Over Feedback/ 14: Fire Alarm/Configurable DI1/Configurable DI2/Configurable DI3/ 18: Pressure Guard");
+d(11402, "Indicates what kind of DI functionality is connected to DI1.\n0: None /Away/BYP/Vacuum Cleaner/Cooker Hood/Crowded/EMT/External Stop/Extra Controller Alarm/Fireplace/Holiday/Refresh/RGS/Change Over Feedback/ 14: Fire Alarm/Configurable DI1/Configurable DI2/Configurable DI3/ 18: Pressure Guard");
+d(11421, "Polarity of DI1.\n0: NO\n1: NC");
+d(11422, "Polarity of DI1.\n0: NO\n1: NC");
+d(12011, "mV");
+d(12012, "mV");
+d(12013, "mV");
+d(12014, "mV");
+d(12015, "mV");
+d(12016, "mV");
+d(12021, "State of UI1");
+d(12022, "State of UI2");
+d(12023, "State of UI3");
+d(12024, "State of UI4");
+d(12025, "State of UI5");
+d(12026, "State of UI6");
+d(12031, "Boolean");
+d(12032, "Boolean");
+d(12101, "Frost Protection Temperature sensor value (Water Heater)");
+d(12102, "Outdoor Air Temperature sensor (standard)");
+d(12103, "Supply Air Temperature sensor (standard)");
+d(12104, "Room Air Temperature sensor (accessory)");
+d(12105, "Extract Air Temperature sensor (accessory)");
+d(12106, "Extra Controller Temperature sensor (accessory)");
+d(12107, "Efficiency temperature sensor (accessory)");
+d(12108, "Over Heat Temperature sensor (Electrical Heater)");
+d(12109, "Relative Humidity Sensor (Accessory)");
+d(12112, "Rotating guard Sensor input");
+d(12115, "CO2 value (accessory)");
+d(12136, "PDM RHS sensor value (standard)");
+d(12151, "CO2 sensor value - UI1 (accessory)");
+d(12152, "CO2 sensor value - UI2 (accessory)");
+d(12153, "CO2 sensor value - UI3 (accessory)");
+d(12154, "CO2 sensor value - UI4 (accessory)");
+d(12155, "CO2 sensor value - UI5 (accessory)");
+d(12156, "CO2 sensor value - UI6 (accessory)");
+d(12161, "RH sensor value - UI1 (accessory)");
+d(12162, "RH sensor value - UI2 (accessory)");
+d(12163, "RH sensor value - UI3 (accessory)");
+d(12164, "RH sensor value - UI4 (accessory)");
+d(12165, "RH sensor value - UI5 (accessory)");
+d(12166, "RH sensor value - UI6 (accessory)");
+d(12301, "Value of physical Digital Input of Away function");
+d(12302, "Value of physical Digital Input of Holiday function");
+d(12303, "Value of physical Digital Input of Fireplace function");
+d(12304, "Value of physical Digital Input of Refresh function");
+d(12305, "Value of physical Digital Input of Crowded function");
+d(12306, "Value of physical Digital Input of Cookerhood function");
+d(12307, "Value of physical Digital Input of Vacuum Cleaner function");
+d(12308, "External Stop input value");
+d(12309, "Load Detected input value");
+d(12310, "Extra controller EMT input value");
+d(12311, "Fire Alarm input value");
+d(12312, "Change over feedback value");
+d(12316, "Indicates if physical DI is active");
+d(12317, "Indicates if physical DI is active");
+d(12318, "Indicates if physical DI is active");
+d(12319, "Indicates if physical DI is active");
+d(12401, "Supply Air Fan RPM indication from TACHO");
+d(12402, "Extract Air Fan RPM indication from TACHO");
+d(12403, "Flow value calculated from piggyback pressure sensor.");
+d(12404, "Flow value calculated from piggyback pressure sensor.");
+d(12405, "Value from Bypass Damper Feedback input.In %.");
+d(12544, "PDM EAT sensor value (standard)");
+d(12931, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12932, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12933, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12934, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12935, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12936, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12937, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12938, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12939, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12940, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12941, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12942, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12943, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12944, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12945, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12946, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12947, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12948, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12949, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12950, "Enable manual override of the device input.\n0: AUTO\n1: OVERRIDE");
+d(12951, "Value to override the device input with.");
+d(12952, "Value to override the device input with.");
+d(12953, "Value to override the device input with.");
+d(12954, "Value to override the device input with.");
+d(12955, "Value to override the device input with.");
+d(12956, "Value to override the device input with.");
+d(12957, "Value to override the device input with.");
+d(12958, "Value to override the device input with.");
+d(12959, "Value to override the device input with.");
+d(12960, "Value to override the device input with.");
+d(12961, "Value to override the device input with.");
+d(12962, "Value to override the device input with.");
+d(12963, "Value to override the device input with.");
+d(12964, "Value to override the device input with.");
+d(12983, "Value to override the device input with.");
+d(12984, "Value to override the device input with.");
+d(12985, "Value to override the device input with.");
+d(12986, "Value to override the device input with.");
+d(12987, "Value to override the device input with.");
+d(12988, "Value to override the device input with.");
+d(12989, "Value to override the device input with.");
+d(12990, "Value to override the device input with.");
+d(13201, "Indicates if the TRIAC shall be used");
+d(13301, "Digital output after multiplexer");
+d(13302, "Digital output after multiplexer");
+d(13303, "Digital output after multiplexer");
+d(13304, "Digital output after multiplexer");
+d(13311, "Analog output after multiplexer");
+d(13312, "Analog output after multiplexer");
+d(13313, "Analog output after multiplexer");
+d(13314, "Analog output after multiplexer");
+d(13315, "Analog output after multiplexer");
+d(13601, "SAF Override.\n0: Auto 1: Manual");
+d(13602, "EAF Override.\n0: Auto 1: Manual");
+d(13801, "SAF Override value in % if manual (1) selected");
+d(13802, "EAF override value in % if manual (1) selected");
+d(14001, "SAF fan speed");
+d(14002, "EAF fan speed");
+d(14003, "Sum Alarm DO\n0: Output not active\n1: Output active");
+d(14004, "Indicates if Outdoor/Exhaust air dampersignal is On/Off");
+d(14101, "Heater AO state.");
+d(14102, "Heater DO state:\n0: Output not active\n1: Output active");
+d(14103, "Heat Exchanger AO state.");
+d(14104, "Heat Exchanger DO state.\n0: Output notactive\n1: Output active");
+d(14201, "Cooler AO state.");
+d(14202, "Cooler DO state:\n0: Output not active\n1: Output active");
+d(14203, "Extra controller AO state.");
+d(14204, "Extra controller DO state:\n0: Output not active\n1: Output active");
+d(14301, "Heating circulation pump output");
+d(14302, "Cooler circulation pump output");
+d(14303, "Change-over circulation pump output");
+d(14304, "Extra controller circulation pump output");
+d(14351, "Voltage signal from AO1");
+d(14352, "Voltage signal from AO2");
+d(14353, "Voltage signal from AO3");
+d(14354, "Voltage signal from AO4");
+d(14355, "Voltage signal from AO5");
+d(14361, "State of DO1");
+d(14362, "State of DO2");
+d(14363, "State of DO3");
+d(14364, "State of DO4");
+d(14371, "Supply air fan control signal in %");
+d(14372, "Extract air fan control signal in %");
+d(14381, "TRIAC control signal");
+d(15002, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15003, "Signal to clear the alarm");
+d(15009, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15010, "Signal to clear the alarm");
+d(15016, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15017, "Signal to clear the alarm");
+d(15023, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15024, "Signal to clear the alarm");
+d(15030, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15031, "Signal to clear the alarm");
+d(15037, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15038, "Signal to clear the alarm");
+d(15058, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15059, "Signal to clear the alarm");
+d(15065, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15066, "Signal to clear the alarm");
+d(15072, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15073, "Signal to clear the alarm");
+d(15079, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15080, "Signal to clear the alarm");
+d(15086, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15087, "Signal to clear the alarm");
+d(15093, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15094, "Signal to clear the alarm");
+d(15100, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15101, "Signal to clear the alarm");
+d(15107, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15108, "Signal to clear the alarm");
+d(15114, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15115, "Signal to clear the alarm");
+d(15121, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15122, "Signal to clear the alarm");
+d(15128, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15129, "Signal to clear the alarm");
+d(15135, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15136, "Signal to clear the alarm");
+d(15142, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15143, "Signal to clear the alarm");
+d(15149, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15150, "Signal to clear the alarm");
+d(15156, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15157, "Signal to clear the alarm");
+d(15163, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15164, "Signal to clear the alarm");
+d(15170, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15171, "Signal to clear the alarm");
+d(15177, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15178, "Signal to clear the alarm");
+d(15184, "Alarm active/inactive\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15185, "Signal to clear the alarm");
+d(15502, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15503, "Signal to clear the alarm");
+d(15509, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15510, "Signal to clear the alarm");
+d(15516, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15517, "Signal to clear the alarm");
+d(15523, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15524, "Signal to clear the alarm");
+d(15530, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15531, "Signal to clear the alarm");
+d(15537, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15538, "Signal to clear the alarm");
+d(15544, "Alarm active/inactive.\n0: Inactive\n1: Active\n2: Waiting\n3: Cleared Error Active");
+d(15545, "Signal to clear the alarm");
+d(15549, "Counter for delay");
+d([
+    15701,
+    15702,
+    15703,
+    15704,
+    15705,
+    15706,
+    15707,
+    15708,
+    15709,
+    15710,
+    15711,
+    15712,
+    15713,
+    15714,
+    15715,
+    15716,
+    15717,
+    15718,
+    15719,
+    15720,
+    15721,
+    15722,
+    15723,
+    15724,
+    15725,
+    15726,
+    15727,
+    15728,
+    15729,
+    15730,
+    15731,
+    15732,
+    15733,
+    15734,
+    15735,
+    15736,
+    15737,
+    15738,
+    15739,
+    15740,
+    15741,
+    15742,
+    15743,
+    15744,
+    15745,
+    15746,
+    15747,
+    15748,
+    15749,
+    15750,
+    15751,
+    15752,
+    15753,
+    15754,
+    15755,
+    15756,
+    15757,
+    15758,
+    15759,
+    15760,
+    15761,
+    15762,
+    15763,
+    15764,
+    15765,
+    15766,
+    15767,
+    15768,
+    15769,
+    15770,
+    15771,
+    15772,
+    15773,
+    15774,
+    15775,
+    15776,
+    15777,
+    15778,
+    15779,
+    15780,
+    15781,
+    15782,
+    15783,
+    15784,
+    15785,
+    15786,
+    15787,
+    15788,
+    15789,
+    15790,
+    15791,
+    15792,
+    15793,
+    15794,
+    15795,
+    15796,
+    15797,
+    15798,
+    15799,
+    15800,
+    15801,
+    15802,
+    15803,
+    15804,
+    15805,
+    15806,
+    15807,
+    15808,
+    15809,
+    15810,
+    15811,
+    15812,
+    15813,
+    15814,
+    15815,
+    15816,
+    15817,
+    15818,
+    15819,
+    15820,
+    15821,
+    15822,
+    15823,
+    15824,
+    15825,
+    15826,
+    15827,
+    15828,
+    15829,
+    15830,
+    15831,
+    15832,
+    15833,
+    15834,
+    15835,
+    15836,
+    15837,
+    15838,
+    15839,
+    15840,
+    15841,
+    15842,
+    15843,
+    15844,
+    15845,
+    15846,
+    15847,
+    15848,
+    15849,
+    15850,
+    15851,
+    15852,
+    15853,
+    15854,
+    15855,
+    15856,
+    15857,
+    15858,
+    15859,
+    15860,
+    15861,
+    15862,
+    15863,
+    15864,
+    15865,
+    15866,
+    15867,
+    15868,
+    15869,
+    15870,
+    15871,
+    15872,
+    15873,
+    15874,
+    15875,
+    15876,
+    15877,
+    15878,
+    15879,
+    15880,
+    15881,
+    15882,
+    15883,
+    15884,
+    15885,
+    15886,
+    15887,
+    15888,
+    15889,
+    15890,
+    15891,
+    15892,
+    15893,
+    15894,
+    15895,
+    15896,
+    15897,
+    15898,
+    15899,
+    15900
+], "Alarm log information");
+d(15901, "Indicates if an alarm Type A is active");
+d(15902, "Indicates if an alarm Type B is active");
+d(15903, "Indicates if an alarm Type C is active");
+d(16001, "Administrator password.Bit 12-15: digit 1\nBit 8-11: digit 2\nBit 4-7: digit 3\nBit 0-3: digit 4");
+d(16002, "Indicates if the User level is locked.\n0: User menu locked\n1: User menu not locked");
+d(16003, "Indicates if the Filter menu is locked.\n0: menu locked\n1: menu not locked");
+d(16004, "Indicates if the Week schedule menu islocked.\n0: menu locked\n1: menu not locked");
+d(16051, "Home screen lock");
+d(16052, "Filter Change menu lock");
+d(16053, "Week schedule menu lock");
+d(16101, "Indicates if the start-up wizard shall beactivated.");
+d(17001, "Modbus address of the MB.Only relevant if the MB is a modbus slave.");
+d(17002, "Baudrate of the modbus connection\n0=1200\n1=2400\n2=4800\n3=9600\n4=14400\n5=19200\n6=28800\n7=38400\n8=57600\n9=76800\n10=115200");
+d(17003, "Parity setting for the modbus connection.\n0: None\n1: Even\n2: Odd");
+d(30101, "Activates setting of the parameters to their default values. Only activated by writing 3228 to this register.");
 
 export { registers };
