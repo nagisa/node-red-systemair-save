@@ -35,7 +35,7 @@ const init: NodeInitializer = (RED) => {
             }
             try {
                 outstanding_requests += 1;
-                return await semaphore.acquire();
+                return semaphore.acquire();
             } finally {
                 outstanding_requests -= 1;
             }
