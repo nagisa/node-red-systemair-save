@@ -30,6 +30,23 @@ export namespace DataType {
                 return buffer.readInt16BE(byte_offset) / 10;
         }
     }
+
+    export function encode(ty: DataType, value: any): Buffer {
+        let buffer = Buffer.alloc(2); // FIXME: for multiple-register definitions
+        switch (ty) {
+            case DataType.Temperature:
+                value = ~~((value as number) * 10);
+                buffer.writeUint16BE(value);
+                break;
+            case DataType.U16:
+                buffer.writeUint16BE(value);
+                break;
+            case DataType.I16:
+                buffer.writeInt16BE(value);
+                break;
+        }
+        return buffer.subarray(0, 2); // FIXME: for multiple-register definitions
+    }
 }
 
 export enum RegisterType {
@@ -64,10 +81,11 @@ export interface SystemairSaveDeviceOptions {
 
 export interface SystemairSaveDevice extends Node<{}> {
     read(register_description: RegisterDescription): Promise<number>;
+    write(register_description: RegisterDescription, value: any): Promise<void>;
 }
 
 declare global {
-    // TODO: relevant types are missing.
+    // TODO: relevant types are missing in upstream type-definitions.
     interface JQuery<TElement = HTMLElement> {
         searchBox(options:any): this;
         searchBox(option: "count", idk:any): this;

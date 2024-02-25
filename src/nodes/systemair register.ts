@@ -1,5 +1,5 @@
 import { NodeInitializer, NodeConstructor, Node, NodeDef, NodeStatusShape } from "node-red";
-import { SystemairSaveDevice, SystemairRegisterNodeOptions, SystemairSaveDeviceOptions, RegisterDescription } from "./systemair_types";
+import { SystemairSaveDevice, SystemairRegisterNodeOptions, SystemairSaveDeviceOptions, RegisterDescription, RegisterType } from "./systemair_types";
 import { registers } from "./systemair_registers";
 
 interface SystemairRegisterNode extends Node<{}> { }
@@ -51,7 +51,7 @@ const init: NodeInitializer = (RED) => {
                 send(msg);
             }
 
-            const payload = msg.payload as { operation: string };
+            const payload = msg.payload as { operation: string, value: any };
             switch (payload.operation) {
                 case "READ":
                     pending_reads += 1;
@@ -63,6 +63,24 @@ const init: NodeInitializer = (RED) => {
                         done();
                     }).catch((e: Error) => {
                         pending_reads -= 1;
+                        show_error(e.message);
+                        done(e);
+                    });
+                    break;
+                case "WRITE":
+                    if (description.register_type != RegisterType.RW) {
+                        const e = new Error("writing a read-only register");
+                        show_error(e.message);
+                        return done(e);
+                    }
+                    pending_writes += 1;
+                    set_status();
+                    broker.write(description, payload.value).then(() => {
+                        pending_writes -= 1;
+                        set_status();
+                        done();
+                    }).catch((e: Error) => {
+                        pending_writes -= 1;
                         show_error(e.message);
                         done(e);
                     });
