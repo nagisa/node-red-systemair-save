@@ -33,6 +33,7 @@ export interface SystemairSaveDeviceOptions {
     port: number,
     timeout: number,
     max_concurrency: number,
+    max_backlog: number,
     device_id: number,
 }
 
@@ -43,9 +44,10 @@ export interface SystemairSaveDevice extends Node<{}> {
 declare global {
     // TODO: relevant types are missing.
     interface JQuery<TElement = HTMLElement> {
-        searchBox(options:any): JQuery<TElement>;
-        searchBox(whatever: "count", idk:any): JQuery<TElement>;
-        treeList(options:any): JQuery<TElement>;
-        treeList(whatever: 'selected'): any;
+        searchBox(options:any): this;
+        searchBox(option: "count", idk:any): this;
+        treeList(option: 'filter', callback: null | ((item: any) => boolean)): this;
+        treeList(option: 'selected'): any;
+        treeList(options: { multi: boolean, data: any }): this;
     }
 }

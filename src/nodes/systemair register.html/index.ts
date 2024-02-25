@@ -1,5 +1,5 @@
 import { EditorRED, EditorNodeProperties } from "node-red";
-import { SystemairRegisterNodeOptions } from "../systemair_types";
+import { RegisterDescription, SystemairRegisterNodeOptions } from "../systemair_types";
 import { registers } from "../systemair_registers";
 
 declare const RED: EditorRED;
@@ -15,7 +15,7 @@ RED.nodes.registerType<SystemairRegisterNodeEditorProperties>("systemair registe
             // TODO: two argument version produces the red triangle, but relevant types are
             // missing.
             // @ts-ignore
-            validate: (v, n) => registers.has(~~v) ? true : "unknown register"
+            validate: (v: string, _: any) => registers.has(~~v) ? true : "unknown register"
         },
         // @ts-ignore
         device: {
@@ -38,7 +38,7 @@ RED.nodes.registerType<SystemairRegisterNodeEditorProperties>("systemair registe
     oneditprepare: function() {
         let register_id = ~~this.register_id;
         let search_field = $("#node-input-register-filter");
-        let register_list;
+        let register_list: JQuery<HTMLElement>;
         let search = search_field.searchBox({
             style: "compact",
             delay: 300,
@@ -48,7 +48,7 @@ RED.nodes.registerType<SystemairRegisterNodeEditorProperties>("systemair registe
                     register_list?.treeList("filter", null);
                     search.searchBox("count","");
                 } else {
-                    var count = register_list?.treeList("filter", function(item) {
+                    var count = register_list?.treeList("filter", function(item: { definition: RegisterDescription }) {
                         const def = item.definition;
                         // I so wish there was a proper fuzzy library...
                         return def.modbus_address.toString().startsWith(val) ||
@@ -59,7 +59,7 @@ RED.nodes.registerType<SystemairRegisterNodeEditorProperties>("systemair registe
                 }
             }
         });
-        let register_data = [];
+        let register_data: any[] = [];
         for (const value of registers.values()) {
             register_data.push({
                 element: $(`<div class="systemair-save-list-container">
@@ -75,18 +75,10 @@ RED.nodes.registerType<SystemairRegisterNodeEditorProperties>("systemair registe
             multi: false,
             data: register_data,
         });
+        register_list.parent().parent().addClass('systemair-dialog-form');
     },
     oneditsave: function() {
         const def = $("#node-input-register-container-div").treeList('selected').definition;
         this.register_id = def.modbus_address.toString();
     },
-    oneditresize: function(size) {
-        let rows = $("#dialog-form>div:not(.node-input-target-list-row)");
-        let height = $("#dialog-form").height();
-        for (let row of rows) {
-            height -= $(row).outerHeight(true);
-        }
-        var editorRow = $("#dialog-form>div.node-input-target-list-row");
-        editorRow.css("height",height+"px");
-    }
 });

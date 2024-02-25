@@ -13,6 +13,7 @@ const init: NodeInitializer = (RED) => {
         RED.nodes.createNode(this, props);
 
         const semaphore = new Semaphore(props.max_concurrency);
+        let outstanding_requests = 0;
 
         const timeout_promise = (ms: number): [() => void, Promise<undefined>] => {
             let timeoutId: NodeJS.Timeout;
@@ -21,7 +22,6 @@ const init: NodeInitializer = (RED) => {
                 ok = _ok;
                 timeoutId = setTimeout(() => err('request timed out'), ms);
             });
-
             return [() => {
                 clearTimeout(timeoutId);
                 ok(undefined);
@@ -29,9 +29,20 @@ const init: NodeInitializer = (RED) => {
 
         };
 
-        // TODO: limit number of pending operations as well.
+        const acquire_resources = async (): Promise<() => void> => {
+            if (outstanding_requests > props.max_backlog) {
+                throw new Error("too many outstanding requests, increase the limit or adjust your flows");
+            }
+            try {
+                outstanding_requests += 1;
+                return await semaphore.acquire();
+            } finally {
+                outstanding_requests -= 1;
+            }
+        };
+
         this.read = async (register_description) => {
-            const release = await semaphore.acquire();
+            const release = await acquire_resources();
             const socket = new Socket();
             const client = new modbus.TCP(socket, ~~props.device_id, props.timeout);
             const [timeout_cancel, timeout] = timeout_promise(props.timeout);
