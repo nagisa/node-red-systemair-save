@@ -6,7 +6,7 @@ import { Semaphore } from "await-semaphore";
 import { isUserRequestError } from "jsmodbus/dist/user-request-error";
 
 
-interface SystemairSaveDeviceProps extends NodeDef, SystemairSaveDeviceOptions {}
+interface SystemairSaveDeviceProps extends NodeDef, SystemairSaveDeviceOptions { }
 
 const init: NodeInitializer = (RED) => {
     const save_device = function(this: SystemairSaveDevice, props: SystemairSaveDeviceProps) {
@@ -42,6 +42,7 @@ const init: NodeInitializer = (RED) => {
         };
 
         this.read = async (register_description) => {
+            const data_type = register_description.data_type;
             const release = await acquire_resources();
             const socket = new Socket();
             const client = new modbus.TCP(socket, ~~props.device_id, props.timeout);
@@ -54,36 +55,36 @@ const init: NodeInitializer = (RED) => {
             let result: any = undefined;
             try {
                 await Promise.race([timeout, socket_ready]);
-                while (result === undefined) {
+                while (true) {
                     try {
                         result = await Promise.race([timeout, client.readHoldingRegisters(
-                            // all register descriptions use logical addresses to make it easy to refer back to
-                            // the pdf tables. At the physical layer we gotta subtract 1 to make them actually
-                            // refer to the right things.
-                            register_description.modbus_address - 1, 1
+                            // all register descriptions use logical addresses to make it easy to
+                            // refer back to the pdf tables. At the physical layer we gotta subtract
+                            // 1 to make them actually refer to the right things.
+                            register_description.modbus_address - 1,
+                            DataType.num_registers(data_type)
                         )]);
+                        break;
                     } catch (e) {
-                        if(!isUserRequestError(e)) { throw e; }
+                        if (!isUserRequestError(e)) { throw e; }
                         // Ocassionally the device will respond with SLAVE_DEVICE_BUSY for a little
                         // while. These are always retryable, so just implement the logic here.
-                        if(e.response?._body?._code !== 6) {
+                        if (e.response?._body?._code !== 6) {
                             throw e;
                         }
                         this.trace("SLAVE_DEVICE_BUSY code, retrying");
+                        continue;
                     }
                 }
             } finally {
                 timeout_cancel();
                 socket.destroy();
-                release();
+                release(); // FIXME: the destroy is probably async? We should only release when the
+                           // socket is fully cleaned up.
             }
 
-            // FIXME: handle registers that are constructed from multiple parts transparently.
-            let value = result.response.body.values[0];
-            if (register_description.data_type == DataType.Temperature) {
-                value /= 10; // TODO: make conversions like these a method of datatype...
-            }
-            return value;
+            const buffer = result.response.body.valuesAsBuffer;
+            return DataType.extract(register_description.data_type, buffer, 0);
         };
     };
 

@@ -6,6 +6,32 @@ export enum DataType {
     Temperature, // U16 scaled by 10
 }
 
+export namespace DataType {
+    export function num_registers(ty: DataType): number {
+        switch (ty) {
+            case DataType.I16:
+            case DataType.U16:
+            case DataType.Temperature:
+                return 1;
+        }
+    }
+
+    export function extract(ty: DataType, buffer: Buffer, byte_offset: number): any {
+        switch (ty) {
+            case DataType.I16:
+                return buffer.readInt16BE(byte_offset);
+            case DataType.U16:
+                return buffer.readUInt16BE(byte_offset);
+            case DataType.Temperature:
+                // Some types are marked as I* (signed) others as unsigned in the documentation but
+                // the temperature reading can never really get high enough for the sign bit to
+                // matter (so, if it is set, we're talking negative temperatures anyway.) Thus just
+                // always read a signed integer here.
+                return buffer.readInt16BE(byte_offset) / 10;
+        }
+    }
+}
+
 export enum RegisterType {
     RO,
     RW,
