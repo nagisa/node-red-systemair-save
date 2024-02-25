@@ -22,7 +22,6 @@ RED.nodes.registerType<SystemairRegisterNodeEditorProperties>("systemair registe
             type:"systemair save device",
             required:true,
         },
-        readback: { value: false },
         output_style: { value: "payload" },
     },
     inputs: 1,

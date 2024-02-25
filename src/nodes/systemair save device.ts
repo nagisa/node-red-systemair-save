@@ -20,7 +20,7 @@ const init: NodeInitializer = (RED) => {
             let ok: (_: undefined) => void;
             const promise = new Promise<undefined>((_ok, err) => {
                 ok = _ok;
-                timeoutId = setTimeout(() => err('request timed out'), ms);
+                timeoutId = setTimeout(() => err(new Error('request timed out')), ms);
             });
             return [() => {
                 clearTimeout(timeoutId);
@@ -77,6 +77,7 @@ const init: NodeInitializer = (RED) => {
                 socket.destroy();
                 release();
             }
+
             // FIXME: handle registers that are constructed from multiple parts transparently.
             let value = result.response.body.values[0];
             if (register_description.data_type == DataType.Temperature) {

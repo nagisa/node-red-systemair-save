@@ -23,7 +23,6 @@ export type RegisterDescription = {
 export interface SystemairRegisterNodeOptions {
     register_id: string;
     device: string;
-    readback: boolean;
     output_style: "payload" | "payload.regname";
 }
 
