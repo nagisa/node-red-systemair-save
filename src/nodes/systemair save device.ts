@@ -15,16 +15,16 @@ const init: NodeInitializer = (RED) => {
         const semaphore = new Semaphore(props.max_concurrency);
         let outstanding_requests = 0;
 
-        const timeout_promise = (ms: number): [() => void, Promise<undefined>] => {
+        const timeout_promise = <T>(ms: number): [(v: T) => void, Promise<T>] => {
             let timeoutId: NodeJS.Timeout;
-            let ok: (_: undefined) => void;
-            const promise = new Promise<undefined>((_ok, err) => {
+            let ok: (_: T) => void;
+            const promise = new Promise<T>((_ok, err) => {
                 ok = _ok;
                 timeoutId = setTimeout(() => err(new Error('request timed out')), ms);
             });
-            return [() => {
+            return [(v) => {
                 clearTimeout(timeoutId);
-                ok(undefined);
+                ok(v);
             }, promise];
 
         };
@@ -46,25 +46,29 @@ const init: NodeInitializer = (RED) => {
             const release = await acquire_resources();
             const socket = new Socket();
             const client = new modbus.TCP(socket, ~~props.device_id, props.timeout);
-            const [timeout_cancel, timeout] = timeout_promise(props.timeout);
+            const [timeout_cancel, timeout] = timeout_promise<any>(props.timeout);
             const socket_ready = new Promise((ok, err) => {
                 socket.on('connect', ok);
                 socket.on('error', err);
             });
+            // NB: we create a socket for each distinct modbus operation. I have seen that IAM tends
+            // to forget open sockets sometimes which can lead to timeouts. Having each read an
+            // individual connection is slower and higher latency, but it also helps isolating the
+            // faults.
             socket.connect({ host: props.address, port: props.port });
-            let result: any = undefined;
             try {
                 await Promise.race([timeout, socket_ready]);
                 while (true) {
                     try {
-                        result = await Promise.race([timeout, client.readHoldingRegisters(
+                        const result = await Promise.race([timeout, client.readHoldingRegisters(
                             // all register descriptions use logical addresses to make it easy to
                             // refer back to the pdf tables. At the physical layer we gotta subtract
                             // 1 to make them actually refer to the right things.
                             register_description.modbus_address - 1,
                             DataType.num_registers(data_type)
                         )]);
-                        break;
+                        const buffer = result.response.body.valuesAsBuffer;
+                        return DataType.extract(register_description.data_type, buffer, 0);
                     } catch (e) {
                         if (!isUserRequestError(e)) { throw e; }
                         // Ocassionally the device will respond with SLAVE_DEVICE_BUSY for a little
@@ -77,14 +81,12 @@ const init: NodeInitializer = (RED) => {
                     }
                 }
             } finally {
-                timeout_cancel();
+                timeout_cancel(undefined);
                 socket.destroy();
                 release(); // FIXME: the destroy is probably async? We should only release when the
                            // socket is fully cleaned up.
             }
 
-            const buffer = result.response.body.valuesAsBuffer;
-            return DataType.extract(register_description.data_type, buffer, 0);
         };
     };
 
