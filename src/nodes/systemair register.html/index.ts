@@ -25,7 +25,8 @@ RED.nodes.registerType<SystemairRegisterNodeEditorProperties>("systemair registe
         output_style: { value: "payload" },
     },
     inputs: 1,
-    outputs: 1,
+    outputs: 2,
+    outputLabels: ["responses", "input passthrough"],
     icon: "systemair.svg",
     label: function() {
         const regname = !this.register_id

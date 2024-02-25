@@ -8,24 +8,12 @@ interface SystemairRegisterNodeProps extends NodeDef, SystemairRegisterNodeOptio
 const init: NodeInitializer = (RED) => {
     const register = function(this: SystemairRegisterNode, props: SystemairRegisterNodeProps) {
         RED.nodes.createNode(this, props);
-        const show_error = (text: string, shape?: NodeStatusShape) => {
-            this.status({ fill: "red", shape: shape ?? "dot", text: text });
-        };
         const broker = RED.nodes.getNode(props.device) as SystemairSaveDevice | undefined;
-        if (broker === undefined) {
-            return show_error("node-red:common.status.error", "ring");
-        }
-        const description = registers.get(~~props.register_id);
-        if (description === undefined) {
-            return show_error("node-red:common.status.error", "ring");
-        }
-
-        let pending_writes = 0;
-        let pending_reads = 0;
-        const set_status = () => {
+        const set_status = (error?: Error) => {
+            if (error) return this.status({ fill: "red", shape: "ring", text: error.message });
             const pending_actions = pending_writes + pending_reads;
             if (pending_actions == 0) {
-                this.status({ fill: "green", shape: "dot", text: `Idle @ ${new Date().toISOString()}` });
+                this.status({ fill: "green", shape: "ring", text: `Idle @ ${new Date().toISOString()}` });
             } else if (pending_writes == 0) {
                 this.status({ fill: "blue", shape: "dot", text: `${pending_reads} reads…` });
             } else if (pending_reads == 0) {
@@ -34,59 +22,67 @@ const init: NodeInitializer = (RED) => {
                 this.status({ fill: "blue", shape: "dot", text: `${pending_actions} actions…` });
             }
         };
+        if (broker === undefined) {
+            return set_status(new Error("node-red:common.status.error"));
+        }
+        const description = registers.get(~~props.register_id);
+        if (description === undefined) {
+            return set_status(new Error("node-red:common.status.error"));
+        }
+        let pending_writes = 0;
+        let pending_reads = 0;
         set_status();
 
         this.on("input", (msg, send, done) => {
-            const sendResponse = (response: number) => {
-                switch (props.output_style) {
-                    case "payload":
-                        RED.util.setMessageProperty(msg, 'topic', description.name, true);
-                        RED.util.setMessageProperty(msg, 'payload', response, true);
-                        break;
-                    case "payload.regname":
-                        RED.util.setMessageProperty(msg, `payload`, {}, true);
-                        RED.util.setMessageProperty(msg, `payload.${description.name}`, response, true);
-                        break;
-                }
-                send(msg);
-            }
-
+            msg = RED.util.cloneMessage(msg);
             const payload = msg.payload as { operation: string, value: any };
+            let error: Error | undefined = undefined;
             switch (payload.operation) {
                 case "READ":
                     pending_reads += 1;
                     set_status();
-                    broker.read(description).then((...args) => {
-                        sendResponse(...args);
-                        pending_reads -= 1;
-                        set_status();
-                        done();
+                    broker.read(description).then((response) => {
+                        let responseMsg;
+                        switch (props.output_style) {
+                            case "payload":
+                                responseMsg = { topic: description.name, payload: response };
+                                break;
+                            case "payload.regname":
+                                responseMsg = { topic: msg.topic, payload: ({} as any) };
+                                responseMsg['payload'][description.name] = response;
+                                break;
+                        }
+                        send([ responseMsg, msg ]);
                     }).catch((e: Error) => {
+                        error = e;
+                        send([ null, msg ]);
+                    }).finally(() => {
+                        RED.util.setMessageProperty(msg, 'error', error);
                         pending_reads -= 1;
-                        show_error(e.message);
-                        done(e);
+                        set_status(error)
+                        return done(error);
                     });
                     break;
                 case "WRITE":
                     if (description.register_type != RegisterType.RW) {
                         const e = new Error("writing a read-only register");
-                        show_error(e.message);
+                        set_status(e);
                         return done(e);
                     }
                     pending_writes += 1;
                     set_status();
-                    broker.write(description, payload.value).then(() => {
+                    broker.write(description, payload.value).catch((e: Error) => {
+                        error = e;
+                    }).finally(() => {
+                        RED.util.setMessageProperty(msg, 'error', error);
+                        send([ null, msg ]);
                         pending_writes -= 1;
-                        set_status();
-                        done();
-                    }).catch((e: Error) => {
-                        pending_writes -= 1;
-                        show_error(e.message);
-                        done(e);
+                        set_status(error);
+                        return done(error);
                     });
                     break;
                 default:
-                    return done();
+                    return done(error);
             }
         });
     };
