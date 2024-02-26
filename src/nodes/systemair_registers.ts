@@ -98,6 +98,7 @@ const registers = new Map<number, RegisterDescription>([
     r(1252, CEL, RW, "FAN_OUTDOOR_COMP_MAX_VALUE", 0, 50),
     r(1253, CEL, RW, "FAN_OUTDOOR_COMP_STOP_T_WINTER", -300, 0),
     r(1254, CEL, RW, "FAN_OUTDOOR_COMP_MAX_TEMP", -300, 0),
+    r(1255, U16, RO, "FAN_OUTDOOR_COMP_RESULT", 0, 100),
     r(1256, CEL, RW, "FAN_OUTDOOR_COMP_START_T_WINTER", -300, 0),
     r(1257, CEL, RW, "FAN_OUTDOOR_COMP_START_T_SUMMER", 150, 300),
     r(1258, CEL, RW, "FAN_OUTDOOR_COMP_STOP_T_SUMMER", 150, 400),
@@ -184,6 +185,7 @@ const registers = new Map<number, RegisterDescription>([
     r(2122, U16, RW, "HEATER_CIRC_PUMP_STOP_DELAY", 0, 60),
     r(2134, U16, RW, "HEAT_EXCHANGER_COOLING_RECOVERY_ON_OFF", 0, 1),
     r(2147, U16, RO, "HEAT_EXCHANGER_RH_TRANSFER_CTRL_ENABLED", UD, UD),
+    r(2148, U16, RO, "HEAT_EXCHANGER_SPEED_LIMIT_RH_TRANSFER", 0, 100),
     r(2149, U16, RO, "PWM_TRIAC_OUTPUT", 0, 100),
     r(2201, U16, RW, "ROTOR_RH_TRANSFER_CTRL_PBAND", 0, 40),
     r(2202, U16, RW, "ROTOR_RH_TRANSFER_CTRL_ITIME", 120, 0),
@@ -853,6 +855,7 @@ d(1251, "Compensate only SF or both SF and EF\n0: SAF\n1: SAF/EAF");
 d(1252, "Compensation value at lowest temperature.");
 d(1253, "Temperature at which compensation reaches maximum value during the winter period.");
 d(1254, "Temperature at which highest compensation is applied.");
+d(1255, "Current outdoor compensation value");
 d(1256, "Temperature at which compensation starts during the winter period.");
 d(1257, "Temperature at which compensation starts during the summer period.");
 d(1258, "Temperature at which compensation reaches maximum value during the summer period.");
@@ -936,7 +939,8 @@ d(2113, "Temperature at which the Heater circulation pump is started");
 d(2122, "Off time delay for the heater circulation pump in minutes");
 d(2134, "Enabling of cooling recovery");
 d(2147, "Indicates if RH trasnfer control shall beapplied");
-d(2149, "TRIAC after manual override");
+d(2148, "As the heat exchanger unit is rotates faster, more moisture returns indoors. If there is a demand to eject moisture outdoors, the rotor speed is limited. This register determines the maximum speed of the rotor due to moisture transfer.");
+d(2149, "Heater TRIAC after manual override");
 d(2201, "Pband setting for RH transfer control");
 d(2202, "Itime setting for RH transfer control");
 d(2203, "Set point setting for RH transfer control");
