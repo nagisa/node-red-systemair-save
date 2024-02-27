@@ -3,7 +3,7 @@ import { Node } from "node-red";
 export enum DataType {
     I16,
     U16,
-    Temperature, // U16 scaled by 10
+    I16_E1, // I16 scaled by 10
 }
 
 export namespace DataType {
@@ -11,7 +11,7 @@ export namespace DataType {
         switch (ty) {
             case DataType.I16:
             case DataType.U16:
-            case DataType.Temperature:
+            case DataType.I16_E1:
                 return 1;
         }
     }
@@ -22,7 +22,7 @@ export namespace DataType {
                 return buffer.readInt16BE(byte_offset);
             case DataType.U16:
                 return buffer.readUInt16BE(byte_offset);
-            case DataType.Temperature:
+            case DataType.I16_E1:
                 // Some types are marked as I* (signed) others as unsigned in the documentation but
                 // the temperature reading can never really get high enough for the sign bit to
                 // matter (so, if it is set, we're talking negative temperatures anyway.) Thus just
@@ -34,7 +34,7 @@ export namespace DataType {
     export function encode(ty: DataType, value: any): Buffer {
         let buffer = Buffer.alloc(2); // FIXME: for multiple-register definitions
         switch (ty) {
-            case DataType.Temperature:
+            case DataType.I16_E1:
                 value = ~~((value as number) * 10);
                 buffer.writeUint16BE(value);
                 break;

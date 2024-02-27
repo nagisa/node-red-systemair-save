@@ -20,7 +20,8 @@ function r(
 
 const U16 = DataType.U16;
 const I16 = DataType.I16;
-const CEL = DataType.Temperature;
+const CEL = DataType.I16_E1;
+const SPH = DataType.I16_E1;
 const RO = RegisterType.RO;
 const RW = RegisterType.RW;
 const UD = undefined;
@@ -191,9 +192,9 @@ const registers = new Map<number, RegisterDescription>([
     r(2202, U16, RW, "ROTOR_RH_TRANSFER_CTRL_ITIME", 120, 0),
     r(2203, U16, RW, "ROTOR_RH_TRANSFER_CTRL_SETPOINT", 100, 45),
     r(2204, U16, RW, "ROTOR_RH_TRANSFER_CTRL_ON_OFF", 1, 1),
-    r(2211, U16, RO, "ROTOR_EA_SPEC_HUMIDITY", UD, UD),
-    r(2212, U16, RO, "ROTOR_OA_SPEC_HUMIDITY", UD, UD),
-    r(2213, U16, RO, "ROTOR_EA_SPEC_HUMIDITY_SETPOINT", UD, UD),
+    r(2211, SPH, RO, "ROTOR_EA_SPEC_HUMIDITY", 0, UD),
+    r(2212, SPH, RO, "ROTOR_OA_SPEC_HUMIDITY", 0, UD),
+    r(2213, SPH, RO, "ROTOR_EA_SPEC_HUMIDITY_SETPOINT", 0, UD),
     r(2311, U16, RO, "COOLER_FROM_SATC", 0, 100),
     r(2314, CEL, RW, "COOLER_CIRC_PUMP_START_T", 0, 200),
     r(2315, CEL, RW, "COOLER_RECOVERY_LIMIT_T", 0, 100),
