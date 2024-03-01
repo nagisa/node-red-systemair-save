@@ -15,6 +15,7 @@ RED.nodes.registerType<SystemairSaveDeviceEditorProperties>("systemair save devi
         max_backlog: { value: 1000, validate: RED.validators.number(true) },
         device_id: { value: 1, validate: RED.validators.number(true) },
         timeout: { value: 5000, validate: RED.validators.number(true) },
+        op_timeout: { value: 1750, validate: RED.validators.number(true) },
     },
     icon: "systemair.svg",
     label: function() {

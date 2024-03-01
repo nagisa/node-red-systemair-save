@@ -7,7 +7,7 @@
     <label for="node-config-input-proto"><i class="fa fa-cog"></i> Protocol</label>
     <select id="node-config-input-proto">
       <option value="Modbus TCP">Modbus TCP</option>
-      <option value="Modbus RTU">Modbus RTU</option>
+      <option disabled>Pull requests welcome</option>
     </select>
   </div>
   <div class="form-row systemair-row">
@@ -17,15 +17,20 @@
     <input type="text" id="node-config-input-device_id" placeholder="Device ID" style="width: 8ch">
   </div>
   <div class="form-row systemair-row">
-    <label for="node-config-input-address"><i class="fa fa-clone"></i> Concurrency</label>
+    <label for="node-config-input-max_concurrency"><i class="fa fa-clone"></i> Concurrency</label>
     <input type="text" id="node-config-input-max_concurrency" placeholder="Maximum concurrency">
   </div>
   <div class="form-row systemair-row">
-    <label for="node-config-input-address"><i class="fa fa-balance-scale"></i> Max Backlog</label>
+    <label for="node-config-input-max_backlog"><i class="fa fa-balance-scale"></i> Max Backlog</label>
     <input type="text" id="node-config-input-max_backlog" placeholder="Maximum backlog">
   </div>
+  <h3><i class="fa fa-clock-o"> Timeouts</i></h3>
   <div class="form-row systemair-row">
-    <label for="node-config-input-address"><i class="fa fa-clock-o"></i> Timeout (ms)</label>
-    <input type="text" id="node-config-input-timeout" placeholder="Request timeout">
+    <label for="node-config-input-timeout">Overall timeout</label>
+    <input type="text" id="node-config-input-timeout" placeholder="Request timeout"> ms
+  </div>
+  <div class="form-row systemair-row">
+    <label for="node-config-input-op_timeout">Request timeout</label>
+    <input type="text" id="node-config-input-op_timeout" placeholder="Attempt timeout"> ms
   </div>
 </script>

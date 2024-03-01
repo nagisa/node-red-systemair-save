@@ -74,6 +74,7 @@ export interface SystemairSaveDeviceOptions {
     address: string,
     port: number,
     timeout: number,
+    op_timeout: number,
     max_concurrency: number,
     max_backlog: number,
     device_id: number,

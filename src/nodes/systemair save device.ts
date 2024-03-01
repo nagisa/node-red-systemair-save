@@ -48,7 +48,7 @@ const init: NodeInitializer = (RED) => {
             // faults.
             const socket = new Socket();
             try {
-                const client = new modbus.TCP(socket, ~~props.device_id, props.timeout);
+                const client = new modbus.TCP(socket, ~~props.device_id, props.op_timeout);
                 const socket_ready = new Promise((ok, err) => {
                     socket.on('connect', ok);
                     socket.on('error', err);
@@ -68,8 +68,11 @@ const init: NodeInitializer = (RED) => {
             const [timeout_cancel, timeout] = timeout_promise<any>(props.timeout);
             let client;
             try {
-                client = await ready_client(timeout);
                 while (true) {
+                    if (client) {
+                        client?.socket.destroy();
+                    }
+                    client = await ready_client(timeout);
                     try {
                         const op = client.readHoldingRegisters(
                             // all register descriptions use logical addresses to make it easy to
@@ -85,11 +88,20 @@ const init: NodeInitializer = (RED) => {
                         if (!isUserRequestError(e)) { throw e; }
                         // Ocassionally the device will respond with SLAVE_DEVICE_BUSY for a little
                         // while. These are always retryable, so just implement the logic here.
-                        if (e.response?._body?._code !== 6) {
-                            throw e;
+                        if (e.response?._body?._code === 6) {
+                            continue;
                         }
-                        this.trace("SLAVE_DEVICE_BUSY code, retrying");
-                        continue;
+                        // We implement a two-tier timeout mechanism. One is the overall request
+                        // timeout, which limits the maximum processing time of a message.
+                        // The other is per-operation timeout, such as read or write. These handle
+                        // the general flakyness of the IAM module. This condition is for the 2nd
+                        // kind of timeout. If it occurs, we loop back to start and attempt this
+                        // operation from scratch. Hopefully this time around IAM does not forget
+                        // the connection!
+                        if (e.err === 'Timeout') {
+                            continue;
+                        }
+                        throw e;
                     }
                 }
             } finally {
