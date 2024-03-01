@@ -1,6 +1,6 @@
 import { NodeInitializer, NodeDef } from "node-red";
 import { DataType, SystemairSaveDevice, SystemairSaveDeviceOptions } from "./systemair_types";
-import { ModbusTCPClient, client as modbus } from "jsmodbus";
+import { ModbusClient, ModbusRTUClient, ModbusTCPClient, client as modbus } from "jsmodbus";
 import { Socket } from 'net';
 import { Semaphore } from "await-semaphore";
 import { isUserRequestError } from "jsmodbus/dist/user-request-error";
@@ -62,8 +62,7 @@ const init: NodeInitializer = (RED) => {
             }
         };
 
-        this.read = async (register_description) => {
-            const data_type = register_description.data_type;
+        const operation = async <R>(op: (client: ModbusTCPClient) => Promise<R>): Promise<R> => {
             const release_resources = await acquire_resources();
             const [timeout_cancel, timeout] = timeout_promise<any>(props.timeout);
             let client;
@@ -74,16 +73,7 @@ const init: NodeInitializer = (RED) => {
                     }
                     client = await ready_client(timeout);
                     try {
-                        const op = client.readHoldingRegisters(
-                            // all register descriptions use logical addresses to make it easy to
-                            // refer back to the pdf tables. At the physical layer we gotta subtract
-                            // 1 to make them actually refer to the right things.
-                            register_description.modbus_address - 1,
-                            DataType.num_registers(data_type)
-                        );
-                        const result = await Promise.race([timeout, op]);
-                        const buffer = result.response.body.valuesAsBuffer;
-                        return DataType.extract(register_description.data_type, buffer, 0);
+                        return await Promise.race([timeout, op(client)]);
                     } catch (e) {
                         if (!isUserRequestError(e)) { throw e; }
                         // Ocassionally the device will respond with SLAVE_DEVICE_BUSY for a little
@@ -110,43 +100,30 @@ const init: NodeInitializer = (RED) => {
                 release_resources(); // FIXME: the destroy is probably async? We should only release when the
                 // socket is fully cleaned up.
             }
+        }
+
+        this.read = async (register_description) => {
+            const data_type = register_description.data_type;
+            let result = await operation((client) => client.readHoldingRegisters(
+                // all register descriptions use logical addresses to make it easy to
+                // refer back to the pdf tables. At the physical layer we gotta subtract
+                // 1 to make them actually refer to the right things.
+                register_description.modbus_address - 1,
+                DataType.num_registers(data_type)
+            ));
+            const buffer = result.response.body.valuesAsBuffer;
+            return DataType.extract(register_description.data_type, buffer, 0);
         };
 
         this.write = async (register_description, value): Promise<void> => {
             const data_type = register_description.data_type;
-            const release_resources = await acquire_resources();
-            const [timeout_cancel, timeout] = timeout_promise<any>(props.timeout);
-            let client;
-            try {
-                client = await ready_client(timeout);
-                while (true) {
-                    try {
-                        const op = client.writeMultipleRegisters(
-                            // all register descriptions use logical addresses to make it easy to
-                            // refer back to the pdf tables. At the physical layer we gotta subtract
-                            // 1 to make them actually refer to the right things.
-                            register_description.modbus_address - 1,
-                            DataType.encode(data_type, value)
-                        )
-                        await Promise.race([timeout, op]);
-                        return;
-                    } catch (e) {
-                        if (!isUserRequestError(e)) { throw e; }
-                        // Ocassionally the device will respond with SLAVE_DEVICE_BUSY for a little
-                        // while. These are always retryable, so just implement the logic here.
-                        if (e.response?._body?._code !== 6) {
-                            throw e;
-                        }
-                        this.trace("SLAVE_DEVICE_BUSY code, retrying");
-                        continue;
-                    }
-                }
-            } finally {
-                timeout_cancel(undefined);
-                client?.socket.destroy();
-                release_resources(); // FIXME: the destroy is probably async? We should only release when the
-                // socket is fully cleaned up.
-            }
+            await operation((client) =>  client.writeMultipleRegisters(
+                // all register descriptions use logical addresses to make it easy to
+                // refer back to the pdf tables. At the physical layer we gotta subtract
+                // 1 to make them actually refer to the right things.
+                register_description.modbus_address - 1,
+                DataType.encode(data_type, value)
+            ));
         };
     };
 
