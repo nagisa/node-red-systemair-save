@@ -1492,4 +1492,10 @@ d(17002, "Baudrate of the modbus connection\n0=1200\n1=2400\n2=4800\n3=9600\n4=1
 d(17003, "Parity setting for the modbus connection.\n0: None\n1: Even\n2: Odd");
 d(30101, "Activates setting of the parameters to their default values. Only activated by writing 3228 to this register.");
 
-export { registers };
+const virtual_registers = new Map<number, RegisterDescription>([
+    r(15000, DataType.ALARMS15000, RO, "ALARMS_150XX", 0, 1),
+    r(15100, DataType.ALARMS15100, RO, "ALARMS_151XX", 0, 1),
+    r(15500, DataType.ALARMS15500, RO, "ALARMS_155XX", 0, 1),
+]);
+
+export { registers, virtual_registers };

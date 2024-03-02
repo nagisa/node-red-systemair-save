@@ -1,6 +1,6 @@
 import { NodeInitializer, Node, NodeDef } from "node-red";
 import { SystemairSaveDevice, SystemairRegisterNodeOptions, RegisterType } from "./systemair_types";
-import { registers } from "./systemair_registers";
+import { registers, virtual_registers } from "./systemair_registers";
 
 interface SystemairRegisterNode extends Node<{}> { }
 interface SystemairRegisterNodeProps extends NodeDef, SystemairRegisterNodeOptions { }
@@ -25,7 +25,8 @@ const init: NodeInitializer = (RED) => {
         if (broker === undefined) {
             return set_status(new Error("node-red:common.status.error"));
         }
-        const description = registers.get(~~props.register_id);
+        const register_map = props.register_type == "virtual" ? virtual_registers : registers;
+        const description = register_map.get(~~props.register_id);
         if (description === undefined) {
             return set_status(new Error("node-red:common.status.error"));
         }
@@ -59,16 +60,7 @@ const init: NodeInitializer = (RED) => {
                 pending_reads += 1;
                 set_status();
                 broker.read(description).then((response) => {
-                    let responseMsg;
-                    switch (props.output_style) {
-                        case "payload":
-                            responseMsg = { topic: description.name, payload: response };
-                            break;
-                        case "payload.regname":
-                            responseMsg = { topic: msg.topic, payload: ({} as any) };
-                            responseMsg['payload'][description.name] = response;
-                            break;
-                    }
+                    const responseMsg = { topic: description.name, payload: response };
                     send([ responseMsg, msg ]);
                 }).catch((e: Error) => {
                     error = e;
