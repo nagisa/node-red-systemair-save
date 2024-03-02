@@ -1,6 +1,6 @@
 {
   "name": "@nagisa~/node-red-systemair-save",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Node-RED nodes to interact with SystemAIR’s SAVE line of products",
   "node-red": {
     "nodes": {

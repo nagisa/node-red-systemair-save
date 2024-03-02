@@ -14,9 +14,11 @@ const init: NodeInitializer = (RED) => {
 
         const semaphore = new Semaphore(props.max_concurrency);
         let cancel = (_: Error) => { };
+        let cancelled: Error | undefined = undefined;
         const cancellation: Promise<never> = new Promise((_, stop) => {
             cancel = stop;
         });
+        cancellation.catch((e) => cancelled = e);
         let outstanding_requests = 0;
 
         const timeout_promise = <T>(ms: number): [(v: T) => void, Promise<T>] => {
@@ -36,10 +38,18 @@ const init: NodeInitializer = (RED) => {
             if (outstanding_requests > props.max_backlog) {
                 throw new Error("too many outstanding requests, increase the limit or adjust your flows");
             }
+            let release = () => {};
             try {
                 outstanding_requests += 1;
-                return await Promise.race([cancellation, semaphore.acquire()]);
+                // This does not correctly handle Promise.race, so implement cancellation checks
+                // manually... Ugh...
+                release = await semaphore.acquire();
+                return release;
             } finally {
+                if (cancelled !== undefined) {
+                    release();
+                    throw cancelled;
+                }
                 outstanding_requests -= 1;
             }
         };
