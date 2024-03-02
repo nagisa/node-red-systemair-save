@@ -1,5 +1,5 @@
-import { NodeInitializer, NodeConstructor, Node, NodeDef, NodeStatusShape } from "node-red";
-import { SystemairSaveDevice, SystemairRegisterNodeOptions, SystemairSaveDeviceOptions, RegisterDescription, RegisterType } from "./systemair_types";
+import { NodeInitializer, Node, NodeDef } from "node-red";
+import { SystemairSaveDevice, SystemairRegisterNodeOptions, RegisterType } from "./systemair_types";
 import { registers } from "./systemair_registers";
 
 interface SystemairRegisterNode extends Node<{}> { }
@@ -35,54 +35,50 @@ const init: NodeInitializer = (RED) => {
 
         this.on("input", (msg, send, done) => {
             msg = RED.util.cloneMessage(msg);
-            const payload = msg.payload as { operation: string, value: any };
+            const payload = msg.payload;
             let error: Error | undefined = undefined;
-            switch (payload.operation) {
-                case "READ":
-                    pending_reads += 1;
-                    set_status();
-                    broker.read(description).then((response) => {
-                        let responseMsg;
-                        switch (props.output_style) {
-                            case "payload":
-                                responseMsg = { topic: description.name, payload: response };
-                                break;
-                            case "payload.regname":
-                                responseMsg = { topic: msg.topic, payload: ({} as any) };
-                                responseMsg['payload'][description.name] = response;
-                                break;
-                        }
-                        send([ responseMsg, msg ]);
-                    }).catch((e: Error) => {
-                        error = e;
-                        send([ null, msg ]);
-                    }).finally(() => {
-                        RED.util.setMessageProperty(msg, 'error', error);
-                        pending_reads -= 1;
-                        set_status(error)
-                        return done(error);
-                    });
-                    break;
-                case "WRITE":
-                    if (description.register_type != RegisterType.RW) {
-                        const e = new Error("writing a read-only register");
-                        set_status(e);
-                        return done(e);
-                    }
-                    pending_writes += 1;
-                    set_status();
-                    broker.write(description, payload.value).catch((e: Error) => {
-                        error = e;
-                    }).finally(() => {
-                        RED.util.setMessageProperty(msg, 'error', error);
-                        send([ null, msg ]);
-                        pending_writes -= 1;
-                        set_status(error);
-                        return done(error);
-                    });
-                    break;
-                default:
+            if (payload !== undefined) {
+                // This is a write operation:
+                if (description.register_type != RegisterType.RW) {
+                    const e = new Error("writing a read-only register");
+                    set_status(e);
+                    return done(e);
+                }
+                pending_writes += 1;
+                set_status();
+                broker.write(description, payload).catch((e: Error) => {
+                    error = e;
+                }).finally(() => {
+                    RED.util.setMessageProperty(msg, 'error', error);
+                    send([ null, msg ]);
+                    pending_writes -= 1;
+                    set_status(error);
                     return done(error);
+                });
+            } else {
+                pending_reads += 1;
+                set_status();
+                broker.read(description).then((response) => {
+                    let responseMsg;
+                    switch (props.output_style) {
+                        case "payload":
+                            responseMsg = { topic: description.name, payload: response };
+                            break;
+                        case "payload.regname":
+                            responseMsg = { topic: msg.topic, payload: ({} as any) };
+                            responseMsg['payload'][description.name] = response;
+                            break;
+                    }
+                    send([ responseMsg, msg ]);
+                }).catch((e: Error) => {
+                    error = e;
+                    send([ null, msg ]);
+                }).finally(() => {
+                    RED.util.setMessageProperty(msg, 'error', error);
+                    pending_reads -= 1;
+                    set_status(error)
+                    return done(error);
+                });
             }
         });
     };
