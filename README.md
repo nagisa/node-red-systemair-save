@@ -10,6 +10,8 @@
 This package provides nodes for the [node-red](https://nodered.org) project to interact with the
 [Systemair SAVE air handling units][mfct].
 
+[mfct]: https://www.systemair.com/en/products/residential-ventilation-systems/air-handling-units/save
+
 **NOTE**: This is a third-party project. Systemair, SAVE, the Systemair logo and various other
 similar identifiers or assets that are referenced in this project are (most likely) trademarks and
 otherwise registered marks of Systemair AB or a related legal entity. Use of these names is only
