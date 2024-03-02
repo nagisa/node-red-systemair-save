@@ -13,6 +13,10 @@ const init: NodeInitializer = (RED) => {
         RED.nodes.createNode(this, props);
 
         const semaphore = new Semaphore(props.max_concurrency);
+        let cancel = (_: Error) => { };
+        const cancellation: Promise<never> = new Promise((_, stop) => {
+            cancel = stop;
+        });
         let outstanding_requests = 0;
 
         const timeout_promise = <T>(ms: number): [(v: T) => void, Promise<T>] => {
@@ -26,7 +30,6 @@ const init: NodeInitializer = (RED) => {
                 clearTimeout(timeoutId);
                 ok(v);
             }, promise];
-
         };
 
         const acquire_resources = async (): Promise<() => void> => {
@@ -35,7 +38,7 @@ const init: NodeInitializer = (RED) => {
             }
             try {
                 outstanding_requests += 1;
-                return semaphore.acquire();
+                return await Promise.race([cancellation, semaphore.acquire()]);
             } finally {
                 outstanding_requests -= 1;
             }
@@ -54,7 +57,7 @@ const init: NodeInitializer = (RED) => {
                     socket.on('error', err);
                 });
                 socket.connect({ host: props.address, port: props.port });
-                await Promise.race([timeout, socket_ready]);
+                await Promise.race([cancellation, timeout, socket_ready]);
                 return client;
             } catch (e) {
                 socket.destroy();
@@ -71,8 +74,9 @@ const init: NodeInitializer = (RED) => {
                     if (client) {
                         client?.socket.destroy();
                     }
-                    client = await ready_client(timeout);
+                    client = await Promise.race([cancellation, ready_client(timeout)]);
                     try {
+                        // If we're now running this request, might as well let it finish.
                         return await Promise.race([timeout, op(client)]);
                     } catch (e) {
                         if (!isUserRequestError(e)) { throw e; }
@@ -124,6 +128,17 @@ const init: NodeInitializer = (RED) => {
                 ));
             }
 
+        };
+
+        this.close = async (removed: boolean): Promise<void> => {
+            cancel(new Error(`node has been ${removed ? "removed" : "stopped"}`));
+            // Grab all of the semaphores here. This will ensure that all operations have completed
+            // and no new ones can start. In order to ensure that this is not soo slow the
+            // `cancel` here will pop a cancellation fuse that's used in strategic locations
+            // thoughout the code to hasten a release of any semaphores already acquired.
+            let semas = Array.from({ length: props.max_concurrency }, () => semaphore.acquire());
+            await Promise.allSettled(semas);
+            return;
         };
     };
 
