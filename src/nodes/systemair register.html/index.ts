@@ -5,6 +5,12 @@ import { registers, virtual_registers } from "../systemair_registers";
 declare const RED: EditorRED;
 interface SystemairRegisterNodeEditorProperties extends EditorNodeProperties, SystemairRegisterNodeOptions { }
 
+const get_register = (type: "virtual" | "real", address: number): RegisterDescription<any> | undefined => {
+    const map = type === "virtual" ? virtual_registers : registers;
+    return map.get(address);
+};
+
+
 RED.nodes.registerType<SystemairRegisterNodeEditorProperties>("systemair register", {
     category: 'network',
     color: '#ffffff',
@@ -16,8 +22,7 @@ RED.nodes.registerType<SystemairRegisterNodeEditorProperties>("systemair registe
             // missing.
             // @ts-ignore
             validate: function(v: string, _: any) {
-                const map = this.register_type === "virtual" ? virtual_registers : registers;
-                return map.has(~~v) ? true : "unknown register";
+                return (get_register(this.register_type, ~~v) ?? "unknown register") || true;
             }
         },
         // @ts-ignore
@@ -38,17 +43,14 @@ RED.nodes.registerType<SystemairRegisterNodeEditorProperties>("systemair registe
     label: function() {
         const regname = !this.register_id
             ? undefined
-            : registers.get(~~this.register_id)?.name
-                .split("_").join(" ");
+            : get_register(this.register_type, ~~this.register_id)?.name.split("_").join(" ");
         return this.name || regname || "register";
     },
     oneditprepare: function() {
         let register_id = ~~this.register_id;
         const register_list = $("#node-input-register-container-div");
         const register_type = $('#node-input-register_type').on("change", () => {
-            let regs = register_type.val() == "virtual"
-                ? virtual_registers
-                : registers;
+            let regs = register_type.val() == "virtual" ? virtual_registers : registers;
             let register_data: any[] = [];
             for (const value of regs.values()) {
                 register_data.push({
@@ -78,7 +80,7 @@ RED.nodes.registerType<SystemairRegisterNodeEditorProperties>("systemair registe
                     register_list?.treeList("filter", null);
                     search.searchBox("count", "");
                 } else {
-                    var count = register_list?.treeList("filter", function(item: { definition: RegisterDescription }) {
+                    var count = register_list?.treeList("filter", function(item: { definition: RegisterDescription<any> }) {
                         const def = item.definition;
                         // I so wish there was a proper fuzzy library...
                         return def.modbus_address.toString().startsWith(val) ||

@@ -1,13 +1,13 @@
 import { RegisterDescription, DataType, RegisterType } from "./systemair_types";
 
-function r(
+function r<P>(
     modbus_address: number,
-    data_type: DataType,
+    data_type: DataType<P>,
     register_type: RegisterType,
     name: string,
     _minimum?: number,
     _maximum?: number,
-): [number, RegisterDescription] {
+): [number, RegisterDescription<P>] {
     const address = ~~modbus_address;
     return [~~modbus_address, {
         name: name,
@@ -18,15 +18,53 @@ function r(
     }];
 }
 
-const U16 = DataType.U16;
-const I16 = DataType.I16;
-const CEL = DataType.I16_E1;
-const SPH = DataType.I16_E1;
+abstract class NumberDataType implements DataType<number> {
+    private scale_factor: number;
+    constructor(scale_factor?: number) {
+        this.scale_factor = scale_factor ?? 1;
+    }
+    read_commands(description: RegisterDescription<number>): { address: number; count: number; }[] {
+        return [{ address: description.modbus_address, count: 1 }];
+    }
+    abstract extract_value(buffer: Buffer): number;
+    extract(buffers: Buffer[]): number {
+        return this.extract_value(buffers[0]) / this.scale_factor;
+    }
+    abstract encode(buffer: Buffer, payload: number): void;
+    encode_writes(description: RegisterDescription<number>, payload: number): { address: number; payload: Buffer; }[] {
+        let buffer = Buffer.alloc(2);
+        this.encode(buffer, (payload * this.scale_factor) | 0)
+        return [{ address: description.modbus_address, payload: buffer }];
+    }
+}
+
+class I16DataType extends NumberDataType {
+    extract_value(buffer: Buffer): number {
+        return buffer.readInt16BE(0);
+    }
+    encode(buffer: Buffer, payload: number) {
+        buffer.writeInt16BE(payload);
+    }
+}
+
+class U16DataType extends NumberDataType {
+    extract_value(buffer: Buffer): number {
+        return buffer.readUInt16BE(0);
+    }
+    encode(buffer: Buffer, payload: number) {
+        buffer.writeUInt16BE(payload);
+    }
+}
+
+const U16 = new U16DataType();
+const I16 = new I16DataType();
+const CEL = new I16DataType(10);
+const SPH = new I16DataType(10);
 const RO = RegisterType.RO;
 const RW = RegisterType.RW;
 const UD = undefined;
 
-const registers = new Map<number, RegisterDescription>([
+const registers = new Map<number, RegisterDescription<number>>([
     r(1001, U16, RO, "DEMC_RH_HIGHEST", 0, 100),
     r(1002, U16, RO, "DEMC_CO2_HIGHEST", 0, 2000),
     r(1011, U16, RO, "DEMC_RH_PI_SP", 0, 100),
@@ -779,9 +817,9 @@ const registers = new Map<number, RegisterDescription>([
     r(30106, U16, RO, "SAFE_CONFIG_VALID", UD, UD),
 ]);
 
-function d(register: number | number[], description: string) {
+function d(register: number | number[], description: string, map = registers) {
     if (typeof register === 'number') {
-        registers.get(register)!.description = description;
+        map.get(register)!.description = description;
     } else {
         for (let r of register) {
             d(r, description);
@@ -1492,10 +1530,156 @@ d(17002, "Baudrate of the modbus connection\n0=1200\n1=2400\n2=4800\n3=9600\n4=1
 d(17003, "Parity setting for the modbus connection.\n0: None\n1: Even\n2: Odd");
 d(30101, "Activates setting of the parameters to their default values. Only activated by writing 3228 to this register.");
 
-const virtual_registers = new Map<number, RegisterDescription>([
-    r(15000, DataType.ALARMS15000, RO, "ALARMS_150XX", 0, 1),
-    r(15100, DataType.ALARMS15100, RO, "ALARMS_151XX", 0, 1),
-    r(15500, DataType.ALARMS15500, RO, "ALARMS_155XX", 0, 1),
+class VirtualAlarmsDataType implements DataType<Record<string, number>> {
+    read_commands(_1: RegisterDescription<Record<string, number>>): { address: number; count: number; }[] {
+        return [
+            { address: 14003, count: 1 }, // SUM alarm
+            { address: 15000, count: 94 },
+            { address: 15100, count: 85 },
+            { address: 15500, count: 45 },
+        ];
+    }
+    extract(buffers: Buffer[]): Record<string, number> {
+        const [sum, a15000, a15100, a15500] = buffers;
+        return {
+            sum_alarm: sum.readUInt16BE(0),
+            saf_ctrl_alarm: a15000.readUInt16BE(2 * 2),
+            eaf_ctrl_alarm: a15000.readUInt16BE(9 * 2),
+            frost_prot_alarm: a15000.readUInt16BE(16 * 2),
+            defrosting_alarm: a15000.readUInt16BE(23 * 2),
+            saf_rpm_alarm: a15000.readUInt16BE(30 * 2),
+            eaf_rpm_alarm: a15000.readUInt16BE(37 * 2),
+            fpt_alarm: a15000.readUInt16BE(58 * 2),
+            oat_alarm: a15000.readUInt16BE(65 * 2),
+            sat_alarm: a15000.readUInt16BE(72 * 2),
+            rat_alarm: a15000.readUInt16BE(79 * 2),
+            eat_alarm: a15000.readUInt16BE(86 * 2),
+            ect_alarm: a15000.readUInt16BE(93 * 2),
+            eft_alarm: a15100.readUInt16BE(0 * 2),
+            oht_alarm: a15100.readUInt16BE(7 * 2),
+            emt_alarm: a15100.readUInt16BE(14 * 2),
+            rgs_alarm: a15100.readUInt16BE(21 * 2),
+            bys_alarm: a15100.readUInt16BE(28 * 2),
+            secondary_air_alarm: a15100.readUInt16BE(35 * 2),
+            filter_alarm: a15100.readUInt16BE(42 * 2),
+            extra_controller_alarm: a15100.readUInt16BE(49 * 2),
+            external_stop_alarm: a15100.readUInt16BE(56 * 2),
+            rh_alarm: a15100.readUInt16BE(63 * 2),
+            co2_alarm: a15100.readUInt16BE(70 * 2),
+            low_sat_alarm: a15100.readUInt16BE(77 * 2),
+            byf_alarm: a15100.readUInt16BE(84 * 2),
+            manual_override_outputs_alarm: a15500.readUInt16BE(2 * 2),
+            pdm_rhs_alarm: a15500.readUInt16BE(9 * 2),
+            pdm_eat_alarm: a15500.readUInt16BE(16 * 2),
+            manual_fan_stop_alarm: a15500.readUInt16BE(23 * 2),
+            overheat_temperature_alarm: a15500.readUInt16BE(30 * 2),
+            fire_alarm_alarm: a15500.readUInt16BE(37 * 2),
+            filter_warning_alarm: a15500.readUInt16BE(44 * 2),
+        };
+    }
+    encode_writes(_1: RegisterDescription<Record<string, number>>, _2: Record<string, number>): never {
+        /// FIXME: writing this could clear the alarm states...
+        throw new Error("ALARM virtual register is not writable (yet)!");
+    }
+}
+
+class VirtualActiveFunctionDataType implements DataType<Record<string, number>> {
+    read_commands(_1: RegisterDescription<Record<string, number>>): { address: number; count: number; }[] {
+        return [
+            { address: 2506, count: 1 },
+            { address: 3100, count: 18 },
+            { address: 4111, count: 1 },
+        ];
+    }
+    extract(buffers: Buffer[]): Record<string, number> {
+        const [eco, fa, fca] = buffers;
+        return {
+            eco_function_active: eco.readUInt16BE(0),
+            free_cooling_active: fca.readUInt16BE(0),
+            function_active_cooling: fa.readUInt16BE(2 * 1),
+            function_active_free_cooling: fa.readUInt16BE(2 * 2),
+            function_active_heating: fa.readUInt16BE(2 * 3),
+            function_active_defrosting: fa.readUInt16BE(2 * 4),
+            function_active_heat_recovery: fa.readUInt16BE(2 * 5),
+            function_active_cooling_recovery: fa.readUInt16BE(2 * 6),
+            function_active_moisture_transfer: fa.readUInt16BE(2 * 7),
+            function_active_secondary_air: fa.readUInt16BE(2 * 8),
+            function_active_vacuum_cleaner: fa.readUInt16BE(2 * 9),
+            function_active_cooker_hood: fa.readUInt16BE(2 * 10),
+            function_active_user_lock: fa.readUInt16BE(2 * 11),
+            function_active_eco_mode: fa.readUInt16BE(2 * 12),
+            function_active_heater_cool_down: fa.readUInt16BE(2 * 13),
+            function_active_pressure_guard: fa.readUInt16BE(2 * 14),
+            function_active_cdi_1: fa.readUInt16BE(2 * 15),
+            function_active_cdi_2: fa.readUInt16BE(2 * 16),
+            function_active_cdi_3: fa.readUInt16BE(2 * 17),
+        };
+    }
+    encode_writes(_1: RegisterDescription<Record<string, number>>, _2: Record<string, number>): never {
+        throw new Error("ACTIVE_FUNCTIONS virtual register is not writable!");
+    }
+}
+
+class VirtualSensorsDataType implements DataType<Record<string, number>> {
+    read_commands(_1: RegisterDescription<Record<string, number>>): { address: number; count: number; }[] {
+        return [
+            { address: 12100, count: 67 },
+            { address: 12400, count: 6 },
+            { address: 12544, count: 1 },
+        ];
+    }
+    extract(buffers: Buffer[]): Record<string, number> {
+        const [s12100, s12400, pdm_eat] = buffers;
+        return {
+            fpt: s12100.readInt16BE(1 * 2) / 10,
+            oat: s12100.readInt16BE(2 * 2) / 10,
+            sat: s12100.readInt16BE(3 * 2) / 10,
+            rat: s12100.readInt16BE(4 * 2) / 10,
+            eat: s12100.readInt16BE(5 * 2) / 10,
+            ect: s12100.readInt16BE(6 * 2) / 10,
+            eft: s12100.readInt16BE(7 * 2) / 10,
+            oht: s12100.readInt16BE(8 * 2) / 10,
+            rhs: s12100.readUInt16BE(9 * 2),
+            rgs: s12100.readUInt16BE(12 * 2),
+            co2s: s12100.readUInt16BE(15 * 2),
+            rhs_pdm: s12100.readUInt16BE(36 * 2),
+            co2s_1: s12100.readUInt16BE(51 * 2),
+            co2s_2: s12100.readUInt16BE(52 * 2),
+            co2s_3: s12100.readUInt16BE(53 * 2),
+            co2s_4: s12100.readUInt16BE(54 * 2),
+            co2s_5: s12100.readUInt16BE(55 * 2),
+            co2s_6: s12100.readUInt16BE(56 * 2),
+            rhs_1: s12100.readUInt16BE(61 * 2),
+            rhs_2: s12100.readUInt16BE(62 * 2),
+            rhs_3: s12100.readUInt16BE(63 * 2),
+            rhs_4: s12100.readUInt16BE(64 * 2),
+            rhs_5: s12100.readUInt16BE(65 * 2),
+            rhs_6: s12100.readUInt16BE(66 * 2),
+            rpm_saf: s12400.readUInt16BE(1 * 2),
+            rpm_eaf: s12400.readUInt16BE(2 * 2),
+            flow_piggyback_saf: s12400.readUInt16BE(3 * 2),
+            flow_piggyback_eaf: s12400.readUInt16BE(4 * 2),
+            di_byf: s12400.readUInt16BE(5 * 2),
+            pdm_eat_value: pdm_eat.readInt16BE(0) / 10,
+        };
+    }
+    encode_writes(_1: RegisterDescription<Record<string, number>>, _2: Record<string, number>): never {
+        throw new Error("SENSORS virtual register is not writable!");
+    }
+}
+
+const virtual_registers = new Map<number, RegisterDescription<any>>([
+    r(3100, new VirtualActiveFunctionDataType(), RO, "FUNCTION_ACTIVE", 0, 1),
+    r(12100, new VirtualSensorsDataType(), RO, "SENSORS", 0, 1),
+    r(15000, new VirtualAlarmsDataType(), RO, "ALARMS", 0, 3),
 ]);
+
+function vd(register: number, description: string) {
+    return d(register, description, virtual_registers);
+}
+
+vd(3100, "Read FUNCTION_ACTIVE_* registers as well as ECO_FUNCTION_ACTIVE and FREE_COOLING_ACTIVE.");
+vd(12100, "Sensor states from registers 121xx, 124xx, and 12544 in a convenient JS record.");
+vd(15000, "All alarm states from registers 14003, 150xx, 151xx and 155xx in a convenient JS record.");
 
 export { registers, virtual_registers };

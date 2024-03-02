@@ -104,26 +104,26 @@ const init: NodeInitializer = (RED) => {
 
         this.read = async (register_description) => {
             const data_type = register_description.data_type;
-            let result = await operation((client) => client.readHoldingRegisters(
-                // all register descriptions use logical addresses to make it easy to
-                // refer back to the pdf tables. At the physical layer we gotta subtract
-                // 1 to make them actually refer to the right things.
-                register_description.modbus_address - 1,
-                DataType.num_registers(data_type)
-            ));
-            const buffer = result.response.body.valuesAsBuffer;
-            return DataType.extract(register_description.data_type, buffer, 0);
+            let buffers = [];
+            for (const command of data_type.read_commands(register_description)) {
+                const result = await operation((client) => client.readHoldingRegisters(
+                    command.address - 1,
+                    command.count,
+                ));
+                buffers.push(result.response.body.valuesAsBuffer);
+            }
+            return data_type.extract(buffers);
         };
 
         this.write = async (register_description, value): Promise<void> => {
             const data_type = register_description.data_type;
-            await operation((client) =>  client.writeMultipleRegisters(
-                // all register descriptions use logical addresses to make it easy to
-                // refer back to the pdf tables. At the physical layer we gotta subtract
-                // 1 to make them actually refer to the right things.
-                register_description.modbus_address - 1,
-                DataType.encode(data_type, value)
-            ));
+            for (const command of data_type.encode_writes(register_description, value)) {
+                await operation((client) => client.writeMultipleRegisters(
+                    command.address - 1,
+                    command.payload
+                ));
+            }
+
         };
     };
 

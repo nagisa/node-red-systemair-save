@@ -11,7 +11,7 @@
   "scripts": {
     "clean": "rm -r ./dist/",
     "copy-assets": "mkdir -p ./dist/nodes/ && cp -r ./src/icons ./dist/nodes/icons",
-    "build:runtime": "tsc ./src/nodes/*.ts --outDir ./dist/nodes -d",
+    "build:runtime": "tsc --project tsconfig.json --outDir ./dist -d",
     "build:editor": "rollup -c ./rollup.js --bundleConfigAsCjs",
     "prepare": "npm run clean; npm run copy-assets & npm run build:runtime & npm run build:editor & wait"
   },
