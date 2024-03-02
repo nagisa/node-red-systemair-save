@@ -1,39 +1,63 @@
 <script type="text/html" data-help-name="systemair register">
-  <p>Consumes a stream of DSMR data such as what might be obtained from an electricity meter over
-      its P1 port, frames it and gives the data a little bit of structure.</p>
+  <p>Controls the associated <code>systemair save device</code> to initiate read or write
+      operations on the configured register(s).</p>
+
+  <h3>Details</h3>
+     This node allows interacting with “real” or “virtual” registers. Real registers are specified
+     by the vendor and map directly to the modbus communication. Alternatively virtual registers
+     abstract away some of the registers away into a more comprehensible package. For instance,
+     instead of reading dozens of individual alarm registers, you can use the <code>ALARMS</code>
+     virtual register node to read all alarm states at once.
+
+     Note, however that real registers and virtual registers alike have scaling applied. So for
+     example, reading and writing temperature registers can return values with one decimal point,
+     even though modbus communication uses integers with a scale of 10.
 
   <h3>Inputs</h3>
     <dl class="message-properties">
         <dt>payload
-            <span class="property-type">string</span>
+            <span class="property-type">undefined</span>
         </dt>
-        <dd>Send this node a command as a string in the payload. Supported commands are:
-          <ul>
-           <li><code>"READ"</code> – initiate a read of the device property.</li>
-          </ul>
-        </dd>
+        <dd>If the <code>payload</code> property is unset, a read of the configured register will
+          be executed.</dd>
         <dt>payload
-            <span class="property-type">number</span>
+            <span class="property-type">number | any</span>
         </dt>
         <dd>Write the provided value to the device’s property. Note that not all registers are
           writeable. Attempts to write to a read-only property will produce an error in the debug
-          panel.</dd>
+          panel. Real registers work exclusively with numbers, whereas the virtual registers may
+          deal with various Javascript objects (which ones is specific to the virtual register
+          chosen.)</dd>
     </dl>
 
  <h3>Outputs</h3>
      <ol class="node-ports">
-         <li>output
+          <li><b>responses</b>
              <dl class="message-properties">
-                 <dt>payload <span class="property-type">number</span></dt>
-                 <dd>current value of the device property. Value will only be output in case of a
-                  successful read from the device.</dd>
+                 <dt>topic <span class="property-type">string</span></dt>
+                 <dd>this node will set the topic name to the register name.</dd>
+                 <dt>payload <span class="property-type">number | any</span></dt>
+                 <dd>the scaled response value of the read operation. For virtual registers this
+                  may contain Javascript objects depending on the exact virtual register chosen.</dd>
+             </dl>
+         </li>
+         <li><b>input passthrough</b> – produces the input message once the handling of it is complete.
+             <dl class="message-properties">
+                 <dt>error <span class="property-type">Error</span></dt>
+                 <dd>if processing the operations as a result of this message failed, this property
+                      will be set to the error that was encountered.</dd>
+                 <dt>* <span class="property-type">any</span></dt>
+                 <dd>all other properties of the original input message are preserved.</dd>
              </dl>
          </li>
      </ol>
 
-  <h3>Details</h3>
-
-
   <h3>References</h3>
+    <ul>
+        <li><a
+          href="https://shop.systemair.com/upload/assets/SAVE_MODBUS_VARIABLE_LIST_20190116__REV__29_.PDF">SAVE Modbus variable list</a> - vendor’s list of the register definitions</li>
+    </ul>
+</script>
+
 
 </script>

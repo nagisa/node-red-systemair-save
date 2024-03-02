@@ -1,4 +1,59 @@
 <script type="text/html" data-help-name="systemair save device">
-  TODO
+<p>Represents a SystemAIR SAVE device, accessible via the IAM module acting as a TCP Modbus proxy.
+    Pull requests are welcome for direct connection.</p>
+
+<h3>Details</h3>
+<p>Due to the relatively flaky nature of the IAM addon, and <code>node-red-contrib-modbus</code>'s
+    relative inability to handle this flakiness, this node should be used to interact with the
+    SystemAIR SAVE family of devices.</p>
+
+<p>This configuration node is responsible for actually executing the read from – and write
+    operations to – the individual <code>systemair register</code> nodes. You will find options
+    such as <code>Concurrency</code>, <code>Max Backlog</code> and timeouts to fine-tune the
+    communication behaviour.</p>
+
+<h3>Configuration Options</h3>
+
+<dl class="message-properties">
+    <dt>Protocol</dt>
+    <dd>selects the communication protocol used.
+        <ul>
+        <li>Modbus TCP – uses the TCP transport for Modbus communication. Appropriate for IAM
+                connected over the etherner cable.</li>
+        </ul>
+    </dd>
+    <dt>Address</dt>
+    <dd>specifies the address at which the gateway or the device can be found. Value depends on the
+        Protocol chosen:
+        <ul>
+        <li>Modbus TCP – enter the IP or domain of the device, port, and the Modbus device ID.</li>
+        </ul>
+    </dd>
+    <dt>Concurrency</dt>
+    <dd>limits the number of operations that can be executed at the same time. Lower values can
+        reduce the speed at which multiple registers are read, however too large a value might
+        put the gateway in a state that makes it refuse any further connections.
+    </dd>
+    <dt>Max backlog</dt>
+    <dd>sets the maximum number of requests that may wait to be executed. This limit might be
+        reached if e.g. concurrency is too low to serve the number of register operations. Once
+        this limit is reached, further operations are discarded.
+    </dd>
+    <dt>Overall timeout</dt>
+    <dd>sets the time limit for handling a single message command sent to a register. Note that the
+        timeout starts counting when the processing of the message begins, rather than the moment
+        at which it is delivered to the register node. So the overall message processing time can
+        exceed this timeout.
+    </dd>
+    <dt>Request timeout</dt>
+    <dd>sets the time limit for handling a single modbus request. When this node is processing a
+        message, it may retry the individual modbus operations multiple times in order to mitigate
+        flakiness of the SystemAIR devices. This value should be set to be at least as long as
+        the device needs to receive, process and respond to the modbus requests. You can also set
+        this to a duration longer than the overall timeout to effectively disable the retry
+        behaviour to an extent (the responses indicating that the device was busy would still
+        initiate a retry attempt.)
+    </dd>
+</dl>
 
 </script>
